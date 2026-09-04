@@ -1,0 +1,25 @@
+{
+  "name": "notion-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser extension that adds a bring-your-own-key Claude / ChatGPT assistant to Notion.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "icons": "node scripts/make-icons.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "openai": "^7.10.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}

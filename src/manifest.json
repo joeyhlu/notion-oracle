@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Notion Oracle",
+  "version": "0.1.0",
+  "description": "Bring-your-own-key Claude / ChatGPT assistant for Notion: chat with the page, summarize, draft, create pages and calendar entries.",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Toggle Notion Oracle (Ctrl+Shift+Space)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.notion.so/*", "https://*.notion.site/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space",
+        "mac": "Command+Shift+Space"
+      },
+      "description": "Show or hide the Oracle panel"
+    }
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.notion.so/*",
+    "https://*.notion.site/*",
+    "https://api.notion.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*"
+  ]
+}
