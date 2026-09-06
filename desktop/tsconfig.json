@@ -13,5 +13,5 @@
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "tests", "../extension/src/lib"]
+  "include": ["src", "tests"]
 }
