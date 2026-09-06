@@ -118,3 +118,43 @@ test("search filters on data_source, and reports multi-source databases", async 
     restore();
   }
 });
+
+test("an empty search lists what the integration can actually see", async () => {
+  let call = 0;
+  const { calls, restore } = stubFetch({
+    "POST /search": (body) => {
+      call++;
+      // First call is the model's filtered query; second is the fallback listing.
+      if (body?.filter) return { json: { results: [], has_more: false, next_cursor: null } };
+      return { json: { results: [{ object: "data_source", id: DS_ID, name: "Habit Tracker", url: "u" }, { object: "page", id: "p1", url: "u2", properties: {} }], has_more: false, next_cursor: null } };
+    },
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("search_notion", { query: "calendar", object_type: "database" });
+    assert.equal(outcome.ok, true);
+    const parsed = JSON.parse(outcome.content) as { results: unknown[]; note: string; visible: Array<{ title: string }> };
+    assert.deepEqual(parsed.results, []);
+    assert.match(parsed.note, /not been shared/);
+    assert.deepEqual(parsed.visible.map((v) => v.title), ["Habit Tracker", "Untitled"]);
+    assert.equal(call, 2);
+    assert.equal(calls[1]?.body?.query, "");
+  } finally {
+    restore();
+  }
+});
+
+test("reports plainly when the integration can see nothing at all", async () => {
+  const { restore } = stubFetch({
+    "POST /search": () => ({ json: { results: [], has_more: false, next_cursor: null } }),
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("search_notion", { query: "calendar" });
+    assert.equal(outcome.ok, true);
+    assert.match(outcome.content, /cannot see anything in the workspace at all/);
+    assert.match(outcome.content, /Connections/);
+  } finally {
+    restore();
+  }
+});

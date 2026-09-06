@@ -153,6 +153,18 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
 
 export const ALL_TOOLS: ToolDefinition[] = [...PAGE_TOOLS, ...NOTION_API_TOOLS];
 
+/** Normalises a search result into the shape the model sees. */
+function describeSearchHit(r: NotionPage | NotionDataSource): Record<string, unknown> {
+  const object = (r as { object?: string }).object;
+  if (object === "data_source" || object === "database") {
+    const ds = r as NotionDataSource;
+    // `id` here is the data source id, which get_database and query_database both accept.
+    return { object: "database", id: ds.id, title: databaseTitle(ds), url: (ds.url as string) ?? "", database_id: ds.database_parent?.database_id };
+  }
+  const page = r as NotionPage;
+  return { object: "page", id: page.id, title: pageTitle(page), url: page.url, parent: page.parent };
+}
+
 export type PageToolRunner = (name: PageToolName, input: Record<string, unknown>) => Promise<PageToolResponse>;
 
 export interface ExecutorDeps {
@@ -189,18 +201,20 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
         case "search_notion": {
           const notion = requireNotion();
           const results = await notion.search(String(input.query ?? ""), input.object_type as "page" | "database" | undefined);
-          if (!results.length) return ok("No results. The integration may not have access to the page: the user must share pages with the Oracle integration via the page's ••• menu → Connections.");
-          return ok(
-            results.map((r) => {
-              const object = (r as { object?: string }).object;
-              if (object === "data_source" || object === "database") {
-                const ds = r as NotionDataSource;
-                // `id` here is the data source id, which get_database and query_database both accept.
-                return { object: "database", id: ds.id, title: databaseTitle(ds), url: (ds.url as string) ?? "", database_id: ds.database_parent?.database_id };
-              }
-              return { object: "page", id: r.id, title: pageTitle(r as NotionPage), url: (r as NotionPage).url, parent: (r as NotionPage).parent };
-            }),
-          );
+          if (results.length) return ok(results.map(describeSearchHit));
+          // A bare "no results" is a dead end: the user cannot tell whether the target is
+          // named something else or was simply never shared. List what is reachable instead.
+          const visible = await notion.search("", undefined, 15);
+          if (!visible.length) {
+            return ok(
+              "No results, and this integration cannot see anything in the workspace at all. Tell the user to share pages with the Oracle integration in Notion: open a top-level page, ••• → Connections → add the integration. Everything nested under a shared page is included.",
+            );
+          }
+          return ok({
+            results: [],
+            note: "Nothing matched that query. Below is everything the integration can currently see. If the item the user meant is not in this list, it has not been shared with the integration yet (••• → Connections in Notion). Offer the closest matches by name before asking them to share anything.",
+            visible: visible.map(describeSearchHit),
+          });
         }
 
         case "get_page": {
