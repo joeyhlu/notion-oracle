@@ -18,7 +18,7 @@ const contexts = await Promise.all([
   // Electron main + preload: CommonJS, node platform, electron kept external.
   esbuild.context({ ...common, platform: "node", format: "cjs", external: ["electron"], entryPoints: { "main/main": "src/main/main.ts", "preload/preload": "src/preload/preload.ts" }, outdir }),
   // Notion MCP server: standalone node script spawned by the AI CLI.
-  esbuild.context({ ...common, platform: "node", format: "cjs", entryPoints: { "mcp/notion-server": "src/mcp/notion-server.ts" }, outdir }),
+  esbuild.context({ ...common, platform: "node", format: "cjs", entryPoints: { "mcp/notion-server": "src/mcp/notion-server.ts", "mcp/calendar-server": "src/mcp/calendar-server.ts" }, outdir }),
   // Renderer: browser bundle.
   esbuild.context({ ...common, platform: "browser", format: "iife", target: ["chrome120"], entryPoints: { "renderer/renderer": "src/renderer/renderer.ts" }, outdir }),
 ]);

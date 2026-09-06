@@ -7,7 +7,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ChatEvent } from "../../shared/types.ts";
 import { spawnCli } from "../process.ts";
-import { displayToolName, summarize, type Brain, type BrainResult, type BrainRunOptions } from "./types.ts";
+import { displayToolName, qualifiedToolNames, summarize, type Brain, type BrainResult, type BrainRunOptions } from "./types.ts";
 
 export interface ClaudeParseState {
   sessionId: string | null;
@@ -117,31 +117,42 @@ export function parseClaudeLine(line: string, state: ClaudeParseState): ChatEven
   return events;
 }
 
+/** Command line for one headless turn. Pure, so the multi-server wiring is unit-testable. */
+export function claudeArgs(opts: Pick<BrainRunOptions, "mcpServers" | "threadId" | "model">, paths: { mcpConfigPath: string; systemPromptPath: string }): string[] {
+  const args = [
+    "-p",
+    "--output-format", "stream-json",
+    "--verbose",
+    "--include-partial-messages",
+    "--strict-mcp-config",
+    "--mcp-config", paths.mcpConfigPath,
+    // No built-in tools: the model gets exactly the MCP tools below and nothing that touches files or shells.
+    "--tools", "",
+    "--allowedTools", ...qualifiedToolNames(opts.mcpServers),
+    "--permission-mode", "dontAsk",
+    "--append-system-prompt-file", paths.systemPromptPath,
+    "--max-turns", "40",
+  ];
+  if (opts.threadId) args.push("--resume", opts.threadId);
+  if (opts.model.trim()) args.push("--model", opts.model.trim());
+  return args;
+}
+
+/** The --mcp-config file contents: one entry per server. */
+export function claudeMcpConfig(servers: BrainRunOptions["mcpServers"]): Record<string, unknown> {
+  return { mcpServers: Object.fromEntries(servers.map((s) => [s.name, { command: s.command, args: s.args, env: s.env }])) };
+}
+
 export class ClaudeBrain implements Brain {
   readonly id = "claude" as const;
 
   run(opts: BrainRunOptions): Promise<BrainResult> {
     const mcpConfigPath = join(opts.tempDir, "mcp-config.json");
     const systemPromptPath = join(opts.tempDir, "system-prompt.txt");
-    writeFileSync(mcpConfigPath, JSON.stringify({ mcpServers: { [opts.mcp.name]: { command: opts.mcp.command, args: opts.mcp.args, env: opts.mcp.env } } }));
+    writeFileSync(mcpConfigPath, JSON.stringify(claudeMcpConfig(opts.mcpServers)));
     writeFileSync(systemPromptPath, opts.systemPrompt);
 
-    const allowed = opts.mcp.toolNames.map((t) => `mcp__${opts.mcp.name}__${t}`);
-    const args = [
-      "-p",
-      "--output-format", "stream-json",
-      "--verbose",
-      "--include-partial-messages",
-      "--strict-mcp-config",
-      "--mcp-config", mcpConfigPath,
-      "--tools", "",
-      "--allowedTools", ...allowed,
-      "--permission-mode", "dontAsk",
-      "--append-system-prompt-file", systemPromptPath,
-      "--max-turns", "40",
-    ];
-    if (opts.threadId) args.push("--resume", opts.threadId);
-    if (opts.model.trim()) args.push("--model", opts.model.trim());
+    const args = claudeArgs(opts, { mcpConfigPath, systemPromptPath });
 
     return new Promise((resolve, reject) => {
       const state = newClaudeState();

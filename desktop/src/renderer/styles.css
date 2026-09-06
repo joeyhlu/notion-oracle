@@ -109,3 +109,4 @@ body.collapsed .panel { display: none; }
 .setup label.checkbox { display: flex; align-items: center; gap: 8px; font-weight: normal; }
 .setup label.checkbox input { width: auto; margin: 0; }
 #follow-note { margin-top: 2px; }
+.setup select { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font: inherit; font-weight: normal; background: var(--bg-2); color: var(--fg); }

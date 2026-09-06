@@ -85,22 +85,24 @@ export function tomlInlineTable(env: Record<string, string>): string {
   return `{ ${entries.join(", ")} }`;
 }
 
+/** Command line for one non-interactive turn. Pure, so the multi-server wiring is unit-testable. */
+export function codexArgs(opts: Pick<BrainRunOptions, "mcpServers" | "threadId" | "model" | "cwd">): string[] {
+  const args = opts.threadId ? ["exec", "resume", opts.threadId] : ["exec"];
+  args.push("--json", "--skip-git-repo-check", "--sandbox", "read-only", "-C", opts.cwd);
+  // Config overrides keep the user's own ~/.codex/config.toml untouched.
+  for (const server of opts.mcpServers) {
+    const key = `mcp_servers.${server.name}`;
+    args.push("-c", `${key}.command=${JSON.stringify(server.command)}`, "-c", `${key}.args=${JSON.stringify(server.args)}`, "-c", `${key}.env=${tomlInlineTable(server.env)}`);
+  }
+  if (opts.model.trim()) args.push("--model", opts.model.trim());
+  return args;
+}
+
 export class CodexBrain implements Brain {
   readonly id = "codex" as const;
 
   run(opts: BrainRunOptions): Promise<BrainResult> {
-    const key = `mcp_servers.${opts.mcp.name}`;
-    const args = opts.threadId ? ["exec", "resume", opts.threadId] : ["exec"];
-    args.push(
-      "--json",
-      "--skip-git-repo-check",
-      "--sandbox", "read-only",
-      "-C", opts.cwd,
-      "-c", `${key}.command=${JSON.stringify(opts.mcp.command)}`,
-      "-c", `${key}.args=${JSON.stringify(opts.mcp.args)}`,
-      "-c", `${key}.env=${tomlInlineTable(opts.mcp.env)}`,
-    );
-    if (opts.model.trim()) args.push("--model", opts.model.trim());
+    const args = codexArgs(opts);
     // Codex has no system-prompt flag for exec; carry the instructions in the first message of a thread.
     const prompt = opts.threadId ? opts.prompt : `<instructions>\n${opts.systemPrompt}\n</instructions>\n\n${opts.prompt}`;
 
