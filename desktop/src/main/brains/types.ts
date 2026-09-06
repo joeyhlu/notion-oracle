@@ -13,7 +13,8 @@ export interface BrainRunOptions {
   prompt: string;
   systemPrompt: string;
   threadId: string | null;
-  mcp: McpServerSpec;
+  /** Every MCP server the CLI should load; tool names are exposed as mcp__<name>__<tool>. */
+  mcpServers: McpServerSpec[];
   model: string;
   cwd: string;
   /** Directory for temp files (mcp config, system prompt). */
@@ -36,6 +37,11 @@ export function summarize(content: unknown, max = 160): string {
   const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((c) => (c && typeof c === "object" && "text" in c ? String((c as { text: unknown }).text) : JSON.stringify(c))).join(" ") : JSON.stringify(content ?? "");
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+}
+
+/** Fully qualified tool names for the CLI's allow-list. */
+export function qualifiedToolNames(servers: McpServerSpec[]): string[] {
+  return servers.flatMap((s) => s.toolNames.map((t) => `mcp__${s.name}__${t}`));
 }
 
 /** Strip the mcp__server__ prefix for display. */

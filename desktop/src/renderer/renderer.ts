@@ -7,7 +7,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
-  "What's on my calendar this week?",
+  "Add an event to my calendar…",
   "Turn this page into a to-do list and add it to the end",
   "Create a page under this one with an outline for…",
 ];
@@ -216,6 +216,9 @@ async function loadSetupForm(): Promise<void> {
   $<HTMLTextAreaElement>("custom-instructions").value = settings.customInstructions;
   $<HTMLInputElement>("hotkey").value = settings.hotkey;
   $<HTMLInputElement>("follow-notion").checked = settings.followNotion;
+  $<HTMLInputElement>("calendar-automation").checked = settings.calendarAutomation;
+  $<HTMLInputElement>("calendar-autosave").checked = settings.calendarAutoSave;
+  $<HTMLSelectElement>("calendar-strategy").value = settings.calendarStrategy;
   $("save-status").textContent = "";
   await checkBrain();
 }
@@ -247,6 +250,9 @@ async function saveSetup(): Promise<void> {
     customInstructions: $<HTMLTextAreaElement>("custom-instructions").value,
     hotkey: $<HTMLInputElement>("hotkey").value.trim() || "CommandOrControl+Shift+Space",
     followNotion: $<HTMLInputElement>("follow-notion").checked,
+    calendarAutomation: $<HTMLInputElement>("calendar-automation").checked,
+    calendarAutoSave: $<HTMLInputElement>("calendar-autosave").checked,
+    calendarStrategy: $<HTMLSelectElement>("calendar-strategy").value === "command-bar" ? "command-bar" : "new-event-key",
     setupComplete: true,
   };
   const cliPath = $<HTMLInputElement>("cli-path").value.trim();

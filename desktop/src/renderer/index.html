@@ -74,6 +74,17 @@
       <label class="checkbox"><input type="checkbox" id="follow-notion"> Only show the overlay while Notion is in front</label>
       <p class="muted" id="follow-note">Keeps the ◎ button off your screen in every other app. The keyboard shortcut still opens Oracle from anywhere.</p>
 
+      <h2>4. Notion Calendar <span class="badge">experimental</span></h2>
+      <p class="muted">Your Google, iCloud or Outlook calendar shown in the Notion Calendar app has no API, so Oracle creates events by operating the app itself: it brings it to the front, jumps to the day, opens a new event and types the title. The app must be open. On macOS, Notion Oracle needs Accessibility permission (System Settings → Privacy &amp; Security → Accessibility).</p>
+      <label class="checkbox"><input type="checkbox" id="calendar-automation"> Let Oracle control the Notion Calendar app</label>
+      <label class="checkbox"><input type="checkbox" id="calendar-autosave"> Save events automatically (otherwise the new event is left open for you to press Enter)</label>
+      <label>How to create events
+        <select id="calendar-strategy">
+          <option value="new-event-key">Jump to the day, press C, type the title (reliable date; adjust the time yourself)</option>
+          <option value="command-bar">Type a natural-language line into Cmd+K (can set the time; depends on the app parsing it)</option>
+        </select>
+      </label>
+
       <div class="setup-footer">
         <button id="btn-save" class="send">Save &amp; start</button>
         <span id="save-status" class="muted"></span>

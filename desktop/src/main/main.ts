@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { NotionClient } from "../../../extension/src/lib/notion.ts";
 import { NOTION_API_TOOLS } from "../../../extension/src/lib/tools.ts";
+import { CALENDAR_TOOL_NAMES } from "../mcp/calendar-tools.ts";
 import { DEFAULT_SETTINGS, type BrainId, type ChatEvent, type ChatRequest, type OverlayMode, type Settings } from "../shared/types.ts";
 import { ClaudeBrain } from "./brains/claude.ts";
 import { CodexBrain } from "./brains/codex.ts";
@@ -179,19 +180,34 @@ async function openExternal(url: string): Promise<void> {
   await shell.openExternal(target);
 }
 
-function serverScriptPath(): string {
-  return join(app.getAppPath(), "dist", "mcp", "notion-server.js").replace("app.asar" + (process.platform === "win32" ? "\\" : "/"), "app.asar.unpacked" + (process.platform === "win32" ? "\\" : "/"));
+function serverScriptPath(file: string): string {
+  const sep = process.platform === "win32" ? "\\" : "/";
+  return join(app.getAppPath(), "dist", "mcp", file).replace(`app.asar${sep}`, `app.asar.unpacked${sep}`);
 }
 
-function mcpSpec(current: Settings): McpServerSpec {
-  return {
-    name: "notion",
-    // Electron's own binary doubles as Node for the tool server, so users need nothing else installed.
-    command: process.execPath,
-    args: [serverScriptPath()],
-    env: { ELECTRON_RUN_AS_NODE: "1", ELECTRON_NO_ATTACH_CONSOLE: "1", NOTION_TOKEN: current.notionToken },
-    toolNames: NOTION_API_TOOLS.map((t) => t.name),
-  };
+/** Electron's own binary doubles as Node for the tool servers, so users need nothing else installed. */
+const NODE_ENV = { ELECTRON_RUN_AS_NODE: "1", ELECTRON_NO_ATTACH_CONSOLE: "1" };
+
+function mcpSpecs(current: Settings): McpServerSpec[] {
+  const servers: McpServerSpec[] = [
+    {
+      name: "notion",
+      command: process.execPath,
+      args: [serverScriptPath("notion-server.js")],
+      env: { ...NODE_ENV, NOTION_TOKEN: current.notionToken },
+      toolNames: NOTION_API_TOOLS.map((t) => t.name),
+    },
+  ];
+  if (current.calendarAutomation && (process.platform === "darwin" || process.platform === "win32")) {
+    servers.push({
+      name: "calendar",
+      command: process.execPath,
+      args: [serverScriptPath("calendar-server.js")],
+      env: { ...NODE_ENV, CALENDAR_AUTO_SAVE: current.calendarAutoSave ? "1" : "0", CALENDAR_STRATEGY: current.calendarStrategy },
+      toolNames: [...CALENDAR_TOOL_NAMES],
+    });
+  }
+  return servers;
 }
 
 async function runChat(request: ChatRequest): Promise<void> {
@@ -216,9 +232,9 @@ async function runChat(request: ChatRequest): Promise<void> {
     await brain.run({
       cliPath,
       prompt: buildUserTurn(request.text, hint),
-      systemPrompt: buildSystemPrompt(current.customInstructions),
+      systemPrompt: buildSystemPrompt(current.customInstructions, { calendar: current.calendarAutomation, calendarAutoSave: current.calendarAutoSave }),
       threadId: request.threadId,
-      mcp: mcpSpec(current),
+      mcpServers: mcpSpecs(current),
       model: current.model,
       cwd,
       tempDir,

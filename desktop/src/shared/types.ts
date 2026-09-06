@@ -14,6 +14,12 @@ export interface Settings {
   customInstructions: string;
   /** Show the overlay only while the Notion app is in the foreground. */
   followNotion: boolean;
+  /** Let Oracle operate the Notion Calendar desktop app to create events. */
+  calendarAutomation: boolean;
+  /** Press Enter to save created events instead of leaving them open for the user to confirm. */
+  calendarAutoSave: boolean;
+  /** How to drive the app: jump-to-day + C, or the Cmd+K natural-language command bar. */
+  calendarStrategy: "new-event-key" | "command-bar";
   setupComplete: boolean;
 }
 
@@ -26,6 +32,9 @@ export const DEFAULT_SETTINGS: Settings = {
   hotkey: "CommandOrControl+Shift+Space",
   customInstructions: "",
   followNotion: true,
+  calendarAutomation: true,
+  calendarAutoSave: false,
+  calendarStrategy: "new-event-key",
   setupComplete: false,
 };
 
