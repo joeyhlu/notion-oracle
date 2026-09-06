@@ -158,3 +158,82 @@ test("reports plainly when the integration can see nothing at all", async () => 
     restore();
   }
 });
+
+const BLOCK_ID = "4d5e6f7a-8b9c-4d0e-8f1a-2b3c4d5e6f7a";
+const PAGE_ID = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+
+test("read_page_blocks exposes block ids so edits have something to target", async () => {
+  const { restore } = stubFetch({
+    [`GET /blocks/${PAGE_ID}/children?page_size=100`]: () => ({
+      json: {
+        results: [
+          { object: "block", id: BLOCK_ID, type: "heading_1", has_children: false, heading_1: { rich_text: [{ type: "text", text: { content: "Terms" }, plain_text: "Terms" }] } },
+          { object: "block", id: "b2", type: "paragraph", has_children: false, paragraph: { rich_text: [{ type: "text", text: { content: "A bit is 0 or 1" }, plain_text: "A bit is 0 or 1" }] } },
+        ],
+        has_more: false,
+        next_cursor: null,
+      },
+    }),
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: PAGE_ID, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("read_page_blocks", { depth: 0 });
+    assert.equal(outcome.ok, true, outcome.content);
+    const blocks = JSON.parse(outcome.content) as Array<{ id: string; type: string; text: string }>;
+    assert.deepEqual(blocks.map((b) => [b.id, b.type, b.text]), [[BLOCK_ID, "heading_1", "Terms"], ["b2", "paragraph", "A bit is 0 or 1"]]);
+  } finally {
+    restore();
+  }
+});
+
+test("update_block rewrites a block in place and can change its type", async () => {
+  const { calls, restore } = stubFetch({
+    [`PATCH /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "heading_2" } }),
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("update_block", { block_id: BLOCK_ID, markdown: "## Terms and definitions" });
+    assert.equal(outcome.ok, true, outcome.content);
+    const patch = calls.find((c) => c.method === "PATCH");
+    assert.equal(patch?.body?.type, "heading_2");
+    const heading = (patch?.body as Record<string, { rich_text: Array<{ text: { content: string } }> }> | null)?.heading_2;
+    assert.equal(heading?.rich_text[0]?.text.content, "Terms and definitions");
+  } finally {
+    restore();
+  }
+});
+
+test("update_block keeps the remainder when markdown expands past one block", async () => {
+  const { calls, restore } = stubFetch({
+    [`PATCH /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "paragraph" } }),
+    [`GET /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "paragraph", parent: { type: "page_id", page_id: PAGE_ID } } }),
+    [`PATCH /blocks/${PAGE_ID}/children`]: () => ({ json: { results: [] } }),
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("update_block", { block_id: BLOCK_ID, markdown: "First line\n\n- second\n- third" });
+    assert.equal(outcome.ok, true, outcome.content);
+    assert.deepEqual(JSON.parse(outcome.content).inserted_after, 2);
+    const insert = calls.find((c) => c.path === `/blocks/${PAGE_ID}/children`);
+    // `after` is what puts the remainder next to the edited block instead of at the page end.
+    assert.equal(insert?.body?.after, BLOCK_ID);
+    assert.equal((insert?.body?.children as unknown[]).length, 2);
+  } finally {
+    restore();
+  }
+});
+
+test("delete_block archives rather than destroys, and says so", async () => {
+  const { calls, restore } = stubFetch({
+    [`DELETE /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, archived: true } }),
+  });
+  try {
+    const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
+    const outcome = await execute("delete_block", { block_id: BLOCK_ID });
+    assert.equal(outcome.ok, true, outcome.content);
+    assert.equal(calls[0]?.method, "DELETE");
+    assert.match(outcome.content, /restored/);
+  } finally {
+    restore();
+  }
+});
