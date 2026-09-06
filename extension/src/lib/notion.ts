@@ -2,7 +2,10 @@
 
 import { blocksToMarkdown, markdownToBlocks, richTextToPlain, type FetchedBlock, type NotionBlock, type RichText } from "./markdown.ts";
 
-export const NOTION_API_VERSION = "2022-06-28";
+// 2025-09-03 introduced data sources: a database is a container for one or more data
+// sources, and schema/query operations moved to /v1/data_sources. Older versions error
+// outright on databases that have more than one data source.
+export const NOTION_API_VERSION = "2025-09-03";
 const BASE_URL = "https://api.notion.com/v1";
 const MAX_CHILDREN_PER_REQUEST = 100;
 
@@ -37,12 +40,41 @@ export interface NotionPage {
   [key: string]: unknown;
 }
 
+export interface DataSourceReference {
+  id: string;
+  name: string;
+}
+
+/** A database is now a container; its rows and schema live on its data sources. */
 export interface NotionDatabase {
   id: string;
   url: string;
   title: RichText[];
-  properties: Record<string, { id: string; name: string; type: string; [key: string]: unknown }>;
+  data_sources?: DataSourceReference[];
   [key: string]: unknown;
+}
+
+export type PropertySchema = Record<string, { id: string; name: string; type: string; [key: string]: unknown }>;
+
+/** A data source holds the property schema and the rows. */
+export interface NotionDataSource {
+  id: string;
+  name?: string;
+  title?: RichText[];
+  database_parent?: { database_id?: string };
+  properties: PropertySchema;
+  [key: string]: unknown;
+}
+
+/** A database plus the data source that schema and row operations should target. */
+export interface ResolvedDataSource {
+  databaseId: string;
+  dataSourceId: string;
+  /** Every data source on the parent database, so callers can report ambiguity. */
+  available: DataSourceReference[];
+  title: string;
+  url: string;
+  properties: PropertySchema;
 }
 
 interface Paginated<T> {
@@ -86,10 +118,11 @@ export class NotionClient {
     return this.request("GET", "/users/me");
   }
 
-  async search(query: string, objectType?: "page" | "database", pageSize = 10): Promise<Array<NotionPage | NotionDatabase>> {
+  /** `object_type` accepts "database" as an alias for "data_source", which is what the API filters on now. */
+  async search(query: string, objectType?: "page" | "database" | "data_source", pageSize = 10): Promise<Array<NotionPage | NotionDataSource>> {
     const body: Record<string, unknown> = { query, page_size: pageSize, sort: { direction: "descending", timestamp: "last_edited_time" } };
-    if (objectType) body.filter = { property: "object", value: objectType };
-    const res = await this.request<Paginated<NotionPage | NotionDatabase>>("POST", "/search", body);
+    if (objectType) body.filter = { property: "object", value: objectType === "page" ? "page" : "data_source" };
+    const res = await this.request<Paginated<NotionPage | NotionDataSource>>("POST", "/search", body);
     return res.results;
   }
 
@@ -101,8 +134,55 @@ export class NotionClient {
     return this.request("GET", `/databases/${normalizeId(databaseId)}`);
   }
 
-  async queryDatabase(databaseId: string, body: Record<string, unknown>): Promise<NotionPage[]> {
-    const res = await this.request<Paginated<NotionPage>>("POST", `/databases/${normalizeId(databaseId)}/query`, body);
+  getDataSource(dataSourceId: string): Promise<NotionDataSource> {
+    return this.request("GET", `/data_sources/${normalizeId(dataSourceId)}`);
+  }
+
+  /**
+   * Accepts either a database id or a data source id and returns the data source to operate on.
+   * Models expect to pass around "the database", but schema and rows live on a data source, so
+   * this resolves one to the other. When a database has several, the first is used and the rest
+   * are reported so the caller can ask the user which they meant.
+   */
+  async resolveDataSource(id: string): Promise<ResolvedDataSource> {
+    const normalized = normalizeId(id);
+    let database: NotionDatabase | null = null;
+    try {
+      database = await this.getDatabase(normalized);
+    } catch (error) {
+      // Not a database id (or not reachable as one) - fall through and try it as a data source.
+      if (!(error instanceof NotionApiError) || (error.status !== 404 && error.status !== 400)) throw error;
+    }
+
+    if (database) {
+      const available = database.data_sources ?? [];
+      const first = available[0];
+      if (!first) throw new Error(`Database "${databaseTitle(database)}" has no data sources to read or write.`);
+      const dataSource = await this.getDataSource(first.id);
+      return {
+        databaseId: database.id,
+        dataSourceId: first.id,
+        available,
+        title: databaseTitle(database),
+        url: database.url,
+        properties: dataSource.properties,
+      };
+    }
+
+    const dataSource = await this.getDataSource(normalized);
+    const databaseId = dataSource.database_parent?.database_id ?? normalized;
+    return {
+      databaseId,
+      dataSourceId: dataSource.id,
+      available: [{ id: dataSource.id, name: dataSource.name ?? richTextToPlain(dataSource.title) }],
+      title: (dataSource.name ?? richTextToPlain(dataSource.title)) || "Untitled",
+      url: (dataSource.url as string) ?? "",
+      properties: dataSource.properties,
+    };
+  }
+
+  async queryDataSource(dataSourceId: string, body: Record<string, unknown>): Promise<NotionPage[]> {
+    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, body);
     return res.results;
   }
 
@@ -167,8 +247,10 @@ export function pageTitle(page: NotionPage): string {
   return "Untitled";
 }
 
-export function databaseTitle(db: NotionDatabase): string {
-  return richTextToPlain(db.title) || "Untitled database";
+export function databaseTitle(db: NotionDatabase | NotionDataSource): string {
+  const named = (db as NotionDataSource).name;
+  if (typeof named === "string" && named) return named;
+  return richTextToPlain(db.title as RichText[] | undefined) || "Untitled database";
 }
 
 /** Flatten a page's property values into readable JSON. */
@@ -217,7 +299,7 @@ const TEXT_VALUE = (s: string): RichText[] => [{ type: "text", text: { content: 
  * Convert simple values ({"Name": "Dentist", "Date": "2026-09-10T14:00:00"}) into Notion property
  * payloads using the database schema. Values already shaped like Notion payloads pass through.
  */
-export function coerceProperties(schema: NotionDatabase["properties"], values: Record<string, unknown>): Record<string, unknown> {
+export function coerceProperties(schema: PropertySchema, values: Record<string, unknown>): Record<string, unknown> {
   const byLowerName = new Map(Object.values(schema).map((p) => [p.name.toLowerCase(), p] as const));
   const out: Record<string, unknown> = {};
   for (const [rawName, value] of Object.entries(values)) {
@@ -278,7 +360,7 @@ function coerceValue(type: string, value: unknown, name: string): unknown {
   }
 }
 
-export function findTitleProperty(schema: NotionDatabase["properties"]): string {
+export function findTitleProperty(schema: PropertySchema): string {
   const title = Object.values(schema).find((p) => p.type === "title");
   return title?.name ?? "Name";
 }
