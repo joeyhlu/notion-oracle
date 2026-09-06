@@ -1,6 +1,6 @@
 /** Thin client for the Notion public API, used with an internal integration token. */
 
-import { blocksToMarkdown, markdownToBlocks, richTextToPlain, type FetchedBlock, type NotionBlock, type RichText } from "./markdown.ts";
+import { blocksToMarkdown, markdownToBlocks, richTextToMarkdown, richTextToPlain, type FetchedBlock, type NotionBlock, type RichText } from "./markdown.ts";
 
 // 2025-09-03 introduced data sources: a database is a container for one or more data
 // sources, and schema/query operations moved to /v1/data_sources. Older versions error
@@ -231,6 +231,54 @@ export class NotionClient {
 
   appendMarkdown(blockId: string, markdown: string): Promise<number> {
     return this.appendBlocks(blockId, markdownToBlocks(markdown));
+  }
+
+  getBlock(blockId: string): Promise<FetchedBlock & { parent?: Record<string, unknown> }> {
+    return this.request("GET", `/blocks/${normalizeId(blockId)}`);
+  }
+
+  /**
+   * Flat listing of a page's blocks with their ids, which is what in-place editing needs:
+   * blocksToMarkdown deliberately drops ids, so the model has nothing to target.
+   */
+  async getBlockOutline(pageId: string, depth = 1): Promise<Array<{ id: string; type: string; text: string; has_children: boolean }>> {
+    const blocks = await this.getBlockChildren(pageId, depth);
+    const flat: Array<{ id: string; type: string; text: string; has_children: boolean }> = [];
+    const walk = (list: FetchedBlock[], prefix: string) => {
+      for (const b of list) {
+        const body = (b[b.type] ?? {}) as Record<string, unknown>;
+        const text = richTextToMarkdown(body.rich_text as RichText[] | undefined);
+        flat.push({ id: b.id, type: b.type, text: prefix + text, has_children: Boolean(b.has_children) });
+        if (b.children?.length) walk(b.children, `${prefix}  `);
+      }
+    };
+    walk(blocks, "");
+    return flat;
+  }
+
+  /** Replace a block's content. Passing a different type converts the block. */
+  updateBlock(blockId: string, block: NotionBlock): Promise<FetchedBlock> {
+    const type = block.type;
+    const body = { type, [type]: (block as Record<string, unknown>)[type] };
+    return this.request("PATCH", `/blocks/${normalizeId(blockId)}`, body);
+  }
+
+  /** Notion archives rather than destroys, so a deleted block is recoverable from the trash. */
+  deleteBlock(blockId: string): Promise<FetchedBlock> {
+    return this.request("DELETE", `/blocks/${normalizeId(blockId)}`);
+  }
+
+  /** Insert blocks directly after an existing sibling, rather than at the end of the page. */
+  async insertBlocksAfter(blockId: string, blocks: NotionBlock[]): Promise<number> {
+    if (!blocks.length) return 0;
+    const target = normalizeId(blockId);
+    const block = await this.getBlock(target);
+    const parent = (block.parent ?? {}) as { type?: string; page_id?: string; block_id?: string };
+    const parentId = parent.page_id ?? parent.block_id;
+    if (!parentId) throw new Error("Could not determine which page or block contains that block.");
+    // `after` positions the insert; without it Notion appends to the end of the parent.
+    await this.request("PATCH", `/blocks/${normalizeId(parentId)}/children`, { children: blocks, after: target });
+    return blocks.length;
   }
 
   updatePage(pageId: string, properties: Record<string, unknown>): Promise<NotionPage> {

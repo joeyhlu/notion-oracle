@@ -35,6 +35,7 @@ The app opens the setup screen on first launch.
 - **⌘⇧Space** / **Ctrl⇧Space** opens the panel from anywhere, even while the pill is hidden. The tray/menu-bar icon works too. Esc collapses it.
 - A panel opened over Notion closes itself when you switch to another app; one you opened deliberately from elsewhere stays put.
 - The header shows **Looking at: <page>** when the Notion app is in front, so "this page" just works.
+- Editing works in place now: "rewrite this section more formally", "convert the Terms list to LaTeX", "turn that paragraph into a heading". Oracle reads the page's block ids, then rewrites, inserts or deletes individual blocks.
 - Try: "Summarize this page", "What's on my calendar this week?", "Add *Dentist* on Sept 12 at 2pm to my Calendar", "Create a page under this one called Q4 Plan with an outline", "Turn this page into a to-do list and add it to the end".
 - Each tool call shows as a small chip while it runs. **Stop** cancels a turn. **✚** starts a new conversation; **⚙** reopens settings.
 - Right-click the tray icon for **Start at login** and **Quit**.

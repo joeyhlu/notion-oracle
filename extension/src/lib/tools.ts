@@ -1,6 +1,7 @@
 /** Tool definitions shared by both providers, plus the executor that runs them. */
 
 import type { PageToolName, PageToolResponse } from "../shared/types.ts";
+import { markdownToBlocks } from "./markdown.ts";
 import { coerceProperties, databaseTitle, findTitleProperty, normalizeId, pageTitle, summarizeProperties, type NotionClient, type NotionDataSource, type NotionPage } from "./notion.ts";
 import type { ToolDefinition, ToolExecutor, ToolOutcome } from "./providers/types.ts";
 
@@ -133,6 +134,56 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
         values: { type: "object", description: "Map of property name to new value. Use null to clear a value." },
       },
       required: ["page_id", "values"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "read_page_blocks",
+    description:
+      "List a page's blocks with their ids, types and text. Call this before editing existing content: get_page returns the page as Markdown without ids, and every editing tool needs a block id to target. Defaults to the page currently open.",
+    input_schema: {
+      type: "object",
+      properties: {
+        page_id: { type: "string", description: `${ID_DESC} Defaults to the page currently open.` },
+        depth: { type: "integer", description: "How many levels of nested blocks to include (0-2, default 1)." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_block",
+    description:
+      "Replace the content of one existing block, editing the page in place. Use this to rewrite a paragraph, fix wording, translate a line, or convert a block to a different type (write Markdown: '# ' for a heading, '- ' for a bullet, '- [ ] ' for a to-do). If the Markdown expands to several blocks the first replaces the target and the rest are inserted after it. Get block ids from read_page_blocks.",
+    input_schema: {
+      type: "object",
+      properties: {
+        block_id: { type: "string", description: "Id of the block to replace, from read_page_blocks." },
+        markdown: { type: "string", description: "New content for the block, in Markdown." },
+      },
+      required: ["block_id", "markdown"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "insert_after_block",
+    description: "Insert new Markdown content directly after a specific block, rather than at the end of the page. Use it to add a paragraph mid-document. Get block ids from read_page_blocks.",
+    input_schema: {
+      type: "object",
+      properties: {
+        block_id: { type: "string", description: "Insert after this block. Get it from read_page_blocks." },
+        markdown: { type: "string", description: "Content to insert, in Markdown." },
+      },
+      required: ["block_id", "markdown"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "delete_block",
+    description: "Delete one block from a page. Notion moves it to the trash, so it can be restored. Confirm with the user before deleting anything they did not explicitly ask you to remove.",
+    input_schema: {
+      type: "object",
+      properties: { block_id: { type: "string", description: "Id of the block to delete, from read_page_blocks." } },
+      required: ["block_id"],
       additionalProperties: false,
     },
   },
@@ -295,6 +346,41 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           }
           const updated = await notion.updatePage(id, properties);
           return ok({ updated: true, id: updated.id, url: updated.url, properties: summarizeProperties(updated.properties) });
+        }
+
+        case "read_page_blocks": {
+          const notion = requireNotion();
+          const id = resolvePageId(input.page_id);
+          const depth = Math.max(0, Math.min(2, Number(input.depth ?? 1)));
+          const outline = await notion.getBlockOutline(id, depth);
+          if (!outline.length) return ok("That page has no blocks yet.");
+          return ok(outline);
+        }
+
+        case "update_block": {
+          const notion = requireNotion();
+          const blocks = markdownToBlocks(String(input.markdown ?? ""));
+          const first = blocks[0];
+          if (!first) return fail("The markdown was empty, so there is nothing to replace the block with. Use delete_block to remove a block.");
+          await notion.updateBlock(String(input.block_id), first);
+          // Markdown that expands past one block keeps its remainder, inserted in order.
+          const rest = blocks.slice(1);
+          const inserted = rest.length ? await notion.insertBlocksAfter(String(input.block_id), rest) : 0;
+          return ok({ updated: true, block_id: input.block_id, type: first.type, inserted_after: inserted });
+        }
+
+        case "insert_after_block": {
+          const notion = requireNotion();
+          const blocks = markdownToBlocks(String(input.markdown ?? ""));
+          if (!blocks.length) return fail("The markdown was empty, so there is nothing to insert.");
+          const count = await notion.insertBlocksAfter(String(input.block_id), blocks);
+          return ok({ inserted: count, after_block_id: input.block_id });
+        }
+
+        case "delete_block": {
+          const notion = requireNotion();
+          await notion.deleteBlock(String(input.block_id));
+          return ok({ deleted: true, block_id: input.block_id, note: "Moved to Notion's trash; it can be restored from there." });
         }
 
         case "append_to_page": {
