@@ -1,7 +1,7 @@
 /** Tool definitions shared by both providers, plus the executor that runs them. */
 
 import type { PageToolName, PageToolResponse } from "../shared/types.ts";
-import { coerceProperties, databaseTitle, findTitleProperty, normalizeId, pageTitle, summarizeProperties, type NotionClient, type NotionDatabase, type NotionPage } from "./notion.ts";
+import { coerceProperties, databaseTitle, findTitleProperty, normalizeId, pageTitle, summarizeProperties, type NotionClient, type NotionDataSource, type NotionPage } from "./notion.ts";
 import type { ToolDefinition, ToolExecutor, ToolOutcome } from "./providers/types.ts";
 
 const ID_DESC = "Notion id (32 hex chars, dashed UUID, or a full Notion URL).";
@@ -71,7 +71,7 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
   {
     name: "get_database",
     description:
-      "Fetch a database's schema: property names, types and options. Always call this before creating or updating database entries so you use the exact property names. Calendars, boards and tables in Notion are all databases.",
+      "Fetch a database's schema: property names, types and options. Always call this before creating or updating database entries so you use the exact property names. Calendars, boards and tables in Notion are all databases. Accepts either a database id or a data source id; a Notion database holds one or more data sources, and this reports which one will be used plus any others to choose from.",
     input_schema: {
       type: "object",
       properties: { database_id: { type: "string", description: ID_DESC } },
@@ -81,7 +81,7 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
   },
   {
     name: "query_database",
-    description: "List entries in a database, optionally filtered and sorted using the Notion API filter/sort syntax. Returns each entry's id, title, URL and properties.",
+    description: "List entries in a database, optionally filtered and sorted using the Notion API filter/sort syntax. Returns each entry's id, title, URL and properties. Accepts a database id or a data source id.",
     input_schema: {
       type: "object",
       properties: {
@@ -115,7 +115,7 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
     input_schema: {
       type: "object",
       properties: {
-        database_id: { type: "string", description: ID_DESC },
+        database_id: { type: "string", description: `${ID_DESC} A data source id also works.` },
         values: { type: "object", description: "Map of property name to value, e.g. {\"Name\":\"Dentist\",\"Date\":\"2026-09-10T14:00:00\",\"Tags\":[\"Health\"]}." },
         content_markdown: { type: "string", description: "Optional page body in Markdown." },
       },
@@ -191,11 +191,15 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const results = await notion.search(String(input.query ?? ""), input.object_type as "page" | "database" | undefined);
           if (!results.length) return ok("No results. The integration may not have access to the page: the user must share pages with the Oracle integration via the page's ••• menu → Connections.");
           return ok(
-            results.map((r) =>
-              (r as NotionDatabase).title !== undefined && (r as { object?: string }).object === "database"
-                ? { object: "database", id: r.id, title: databaseTitle(r as NotionDatabase), url: r.url }
-                : { object: "page", id: r.id, title: pageTitle(r as NotionPage), url: r.url, parent: (r as NotionPage).parent },
-            ),
+            results.map((r) => {
+              const object = (r as { object?: string }).object;
+              if (object === "data_source" || object === "database") {
+                const ds = r as NotionDataSource;
+                // `id` here is the data source id, which get_database and query_database both accept.
+                return { object: "database", id: ds.id, title: databaseTitle(ds), url: (ds.url as string) ?? "", database_id: ds.database_parent?.database_id };
+              }
+              return { object: "page", id: r.id, title: pageTitle(r as NotionPage), url: (r as NotionPage).url, parent: (r as NotionPage).parent };
+            }),
           );
         }
 
@@ -208,12 +212,24 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
 
         case "get_database": {
           const notion = requireNotion();
-          const db = await notion.getDatabase(String(input.database_id));
-          const properties = Object.values(db.properties).map((p) => {
+          const resolved = await notion.resolveDataSource(String(input.database_id));
+          const properties = Object.values(resolved.properties).map((p) => {
             const detail = p[p.type] as { options?: Array<{ name: string }> } | undefined;
             return { name: p.name, type: p.type, ...(detail?.options ? { options: detail.options.map((o) => o.name) } : {}) };
           });
-          return ok({ id: db.id, title: databaseTitle(db), url: db.url, properties });
+          return ok({
+            database_id: resolved.databaseId,
+            data_source_id: resolved.dataSourceId,
+            title: resolved.title,
+            url: resolved.url,
+            properties,
+            ...(resolved.available.length > 1
+              ? {
+                  note: `This database has ${resolved.available.length} data sources; "${resolved.available[0]?.name}" was used. Pass another data source id to target it instead.`,
+                  data_sources: resolved.available,
+                }
+              : {}),
+          });
         }
 
         case "query_database": {
@@ -221,7 +237,8 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const body: Record<string, unknown> = { page_size: Math.min(100, Math.max(1, Number(input.page_size) || 25)) };
           if (input.filter) body.filter = input.filter;
           if (input.sorts) body.sorts = input.sorts;
-          const pages = await notion.queryDatabase(String(input.database_id), body);
+          const { dataSourceId } = await notion.resolveDataSource(String(input.database_id));
+          const pages = await notion.queryDataSource(dataSourceId, body);
           return ok(pages.map((p) => ({ id: p.id, title: pageTitle(p), url: p.url, properties: summarizeProperties(p.properties) })));
         }
 
@@ -238,12 +255,12 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
 
         case "create_database_entry": {
           const notion = requireNotion();
-          const db = await notion.getDatabase(String(input.database_id));
+          const resolved = await notion.resolveDataSource(String(input.database_id));
           const values = { ...((input.values ?? {}) as Record<string, unknown>) };
-          const titleProp = findTitleProperty(db.properties);
+          const titleProp = findTitleProperty(resolved.properties);
           if (!(titleProp in values) && typeof input.title === "string") values[titleProp] = input.title;
-          const properties = coerceProperties(db.properties, values);
-          const page = await notion.createPage({ database_id: db.id }, properties, typeof input.content_markdown === "string" ? input.content_markdown : undefined);
+          const properties = coerceProperties(resolved.properties, values);
+          const page = await notion.createPage({ type: "data_source_id", data_source_id: resolved.dataSourceId }, properties, typeof input.content_markdown === "string" ? input.content_markdown : undefined);
           return ok({ created: true, id: page.id, url: page.url, properties: summarizeProperties(page.properties) });
         }
 
@@ -252,11 +269,12 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const id = resolvePageId(input.page_id);
           const page = await notion.getPage(id);
           const values = (input.values ?? {}) as Record<string, unknown>;
-          const parent = page.parent as { type?: string; database_id?: string };
+          const parent = page.parent as { type?: string; database_id?: string; data_source_id?: string };
           let properties: Record<string, unknown>;
-          if (parent.type === "database_id" && parent.database_id) {
-            const db = await notion.getDatabase(parent.database_id);
-            properties = coerceProperties(db.properties, values);
+          const parentId = parent.data_source_id ?? parent.database_id;
+          if ((parent.type === "data_source_id" || parent.type === "database_id") && parentId) {
+            const resolved = await notion.resolveDataSource(parentId);
+            properties = coerceProperties(resolved.properties, values);
           } else {
             const schema = Object.fromEntries(Object.entries(page.properties).map(([k, v]) => [k, { id: String(v.id ?? k), name: k, type: String(v.type) }]));
             properties = coerceProperties(schema, values);

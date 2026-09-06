@@ -14,11 +14,11 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-  # Ad-hoc signed ("-"): no Apple Developer account, but the app still carries a valid
-  # signature. Apple Silicon refuses to run binaries with no/broken signature at all, which
-  # is what produces "the app is damaged" rather than the milder unidentified-developer
-  # prompt. Users still approve the app once on first launch (see INSTALL.md).
-  identity: "-"
+  # Signing is done by scripts/afterPack.cjs, which ad-hoc signs the bundle with codesign.
+  # electron-builder's `identity` only searches the keychain, so no value it accepts means
+  # "ad-hoc" - "-" makes it hunt for a certificate named "-", find none, and skip signing,
+  # leaving a bundle macOS reports as damaged. null stops it trying; the hook does the work.
+  identity: null
   # Hardened runtime only pays off with notarization, and combined with an ad-hoc signature
   # it is a known cause of launch crashes.
   hardenedRuntime: false
@@ -37,4 +37,5 @@ linux:
   icon: build/icon.png
   category: Utility
   target: [AppImage]
+afterPack: scripts/afterPack.cjs
 publish: null
