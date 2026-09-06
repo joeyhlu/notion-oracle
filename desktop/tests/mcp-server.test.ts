@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { NOTION_API_TOOLS } from "../../extension/src/lib/tools.ts";
 
 const server = join(import.meta.dirname, "..", "dist", "mcp", "notion-server.js");
 
@@ -23,7 +24,8 @@ test("built MCP server answers initialize, tools/list and tools/call over stdio"
   assert.equal(replies.size, 4);
   assert.equal(replies.get(1)!.result!.protocolVersion, "2025-06-18");
   const tools = replies.get(2)!.result!.tools as Array<{ name: string; inputSchema: unknown }>;
-  assert.equal(tools.length, 8);
+  // Compare against the source of truth so adding a tool cannot silently break this test.
+  assert.deepEqual(tools.map((t) => t.name).sort(), NOTION_API_TOOLS.map((t) => t.name).sort());
   assert.ok(tools.every((t) => t.inputSchema));
   const call = replies.get(3)!.result as { isError: boolean; content: Array<{ text: string }> };
   assert.equal(call.isError, true);
