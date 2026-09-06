@@ -97,6 +97,9 @@ function createWindow(): void {
     ...COLLAPSED,
     frame: false,
     transparent: true,
+    // The overlay is shown without stealing focus, so without this the first click on it is
+    // consumed just to activate the window instead of pressing what the user aimed at.
+    acceptFirstMouse: true,
     hasShadow: false,
     resizable: false,
     alwaysOnTop: true,
