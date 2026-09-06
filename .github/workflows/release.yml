@@ -41,9 +41,23 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npx electron-builder --publish never
-        env:
-          # Unsigned builds; see README for the one-time Gatekeeper / SmartScreen step.
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      # Proves the macOS build carries a valid (ad-hoc) signature. An app with a broken or
+      # missing signature is what makes macOS report "the app is damaged", so this must fail
+      # the build rather than ship a DMG nobody can open.
+      - name: Verify macOS code signature
+        if: matrix.os == 'macos-latest'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(release/mac*/*.app)
+          if [ ${#apps[@]} -eq 0 ]; then echo "No .app bundle was produced"; exit 1; fi
+          for app in "${apps[@]}"; do
+            echo "::group::$app"
+            codesign -dv --verbose=4 "$app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            echo "::endgroup::"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: notion-oracle-${{ matrix.os }}

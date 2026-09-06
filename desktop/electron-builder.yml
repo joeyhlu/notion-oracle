@@ -14,8 +14,17 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-  # Unsigned: users open it once via right-click → Open (see README).
-  identity: null
+  # Ad-hoc signed ("-"): no Apple Developer account, but the app still carries a valid
+  # signature. Apple Silicon refuses to run binaries with no/broken signature at all, which
+  # is what produces "the app is damaged" rather than the milder unidentified-developer
+  # prompt. Users still approve the app once on first launch (see INSTALL.md).
+  identity: "-"
+  # Hardened runtime only pays off with notarization, and combined with an ad-hoc signature
+  # it is a known cause of launch crashes.
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 win:
   icon: build/icon.png
   target:
