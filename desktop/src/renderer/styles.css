@@ -13,9 +13,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 a { color: var(--accent); }
 
 /* Collapsed: only the pill is visible. Expanded: only the panel. */
+/*
+ * The 8px ring around the pill drags the window; the pill itself must NOT be a drag region.
+ * A -webkit-app-region: drag element is treated by the OS as a title bar, so the window
+ * manager swallows clicks on it and they never reach the page - the button looks dead.
+ */
+body.collapsed { -webkit-app-region: drag; }
 .pill {
   position: absolute; inset: 8px; border-radius: 50%; border: 1px solid var(--border); background: var(--accent); color: var(--accent-fg);
-  font-size: 22px; box-shadow: 0 6px 20px rgba(0,0,0,.25); -webkit-app-region: drag; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; box-shadow: 0 6px 20px rgba(0,0,0,.25); -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
 }
 .pill:hover { transform: scale(1.05); }
 body.expanded .pill { display: none; }

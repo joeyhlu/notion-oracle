@@ -123,6 +123,7 @@ Run these in order. Each builds on the last, so the first one that fails tells y
 | Symptom | Fix |
 |---|---|
 | Hotkey does nothing | Another app claimed it. Use the menu-bar / system-tray icon. Rebind in settings. |
+| ◎ pill does nothing when clicked | Fixed in 0.1.4. On older builds use the shortcut or the menu-bar icon. |
 | ◎ pill never appears | It only shows while Notion is in front. If it stays hidden even in Notion, untick **Only show over Notion** in the tray menu — on macOS the foreground check can need Accessibility permission. |
 | "Not signed in" | Run `claude auth login` (or `codex login`) in a terminal again, then **Re-check**. |
 | "I can't find that page" | The Settings → Connections sharing step. |
