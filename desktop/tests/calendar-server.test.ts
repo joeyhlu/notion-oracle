@@ -57,15 +57,21 @@ test("initialize and tools/list expose exactly the four calendar tools, each wit
   );
 });
 
-test("calendar_status on this (Linux) platform reports unsupported without touching the app", async () => {
+// CI runs these on all three platforms. Notion Calendar is installed on none of them, so the
+// app is never running, but the control method differs: macOS and Windows really probe for the
+// app, Linux reports the platform as unsupported.
+const EXPECTED_METHOD = process.platform === "darwin" ? "applescript" : process.platform === "win32" ? "powershell" : "unsupported";
+const APP_UNREACHABLE = /is not running|only supported on macOS and Windows/;
+
+test("calendar_status reports the platform's control method and that the app is not running", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "calendar_status", arguments: {} } });
 
   const call = toolCallResult(repliesById(lines).get(1)!);
   assert.equal(call.isError, false);
   const status = JSON.parse(call.content[0]!.text) as { running: boolean; platform: string; method: string };
-  assert.equal(status.platform, "linux");
-  assert.equal(status.method, "unsupported");
+  assert.equal(status.platform, process.platform);
+  assert.equal(status.method, EXPECTED_METHOD);
   assert.equal(status.running, false);
 });
 
@@ -85,7 +91,7 @@ test("calendar_create_event reports a bad date as a bad date, even when the app 
   assert.match(call.content[0]!.text, /ISO 8601/);
 });
 
-test("calendar_create_event with valid input fails on the app check on this platform, without running a plan", async () => {
+test("calendar_create_event with valid input stops at the app check when the app is unreachable", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({
     jsonrpc: "2.0",
@@ -95,7 +101,7 @@ test("calendar_create_event with valid input fails on the app check on this plat
   });
   const call = toolCallResult(repliesById(lines).get(1)!);
   assert.equal(call.isError, true);
-  assert.match(call.content[0]!.text, /only supported on macOS and Windows/);
+  assert.match(call.content[0]!.text, APP_UNREACHABLE);
 });
 
 test("calendar_open_date surfaces the ISO 8601 parsing error for a bad date (parseWhen runs before any platform check)", async () => {
