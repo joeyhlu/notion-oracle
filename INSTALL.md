@@ -34,13 +34,28 @@ Go to the [latest release](../../releases/latest) and scroll to **Assets** near 
 - **Windows:** double-click the `.exe` and click through the installer.
 - **Linux:** `chmod +x Notion.Oracle-*.AppImage`, then run it.
 
-### The first launch will look broken. It isn't.
+### The first launch will look blocked. It isn't broken.
 
-These builds are not code-signed, so your computer does not recognise the publisher.
+These builds carry an ad-hoc signature but are not notarized by Apple (that needs a paid
+Apple Developer account), so your computer cannot identify the publisher.
 
-- **Mac:** do **not** double-click. Open Applications, **right-click** Notion Oracle → **Open**, then click **Open** again in the dialog. Only needed once.
-  If macOS insists the app is damaged, run: `xattr -cr "/Applications/Notion Oracle.app"`
-- **Windows:** at "Windows protected your PC", click **More info** → **Run anyway**.
+**Mac — try these in order, stopping at the first that works:**
+
+1. Open Applications, **right-click** Notion Oracle → **Open**, then **Open** again in the dialog.
+2. If macOS refuses anyway: **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the message about Notion Oracle. (On macOS Sequoia and later this is
+   usually the required route — the right-click trick no longer always works.)
+3. If it still says the app is **damaged**, clear the download quarantine flag and re-sign it
+   locally:
+
+   ```bash
+   xattr -cr "/Applications/Notion Oracle.app"
+   codesign --force --deep --sign - "/Applications/Notion Oracle.app"
+   ```
+
+Any of these is a one-time step; afterwards the app opens by double-click like anything else.
+
+**Windows:** at "Windows protected your PC", click **More info** → **Run anyway**.
 
 ---
 
@@ -111,7 +126,7 @@ Run these in order. Each builds on the last, so the first one that fails tells y
 | "Not signed in" | Run `claude auth login` (or `codex login`) in a terminal again, then **Re-check**. |
 | "I can't find that page" | The Settings → Connections sharing step. |
 | Test Notion sees zero pages | Same — the integration has not been added to any page. |
-| Mac: "app is damaged" or won't open | You double-clicked. Right-click → **Open**, or run the `xattr -cr` command above. |
+| Mac: "app is damaged" or won't open | Work down the three steps in Part 1 — right-click → Open, then System Settings → Privacy & Security → Open Anyway, then the `xattr` + `codesign` commands. |
 | Nothing happens after a long pause | Open a new conversation with **✚**; if it persists, check the AI tool still reports signed in. |
 
 Found something not covered here? [Open an issue](../../issues) with the exact error text and what you asked.

@@ -6,7 +6,7 @@ A floating AI panel that sits next to the Notion desktop app. It runs on your ow
 
 **From a release:** grab the `.dmg` (Mac) or `.exe` (Windows) from the [Releases](../../../releases) page.
 
-- **Mac:** the build is not code-signed, so the first launch needs a right-click → **Open** → **Open** (or `xattr -cr "/Applications/Notion Oracle.app"`). After that it opens normally.
+- **Mac:** builds are ad-hoc signed but not notarized, so the first launch needs approval: right-click → **Open**, or **System Settings → Privacy & Security → Open Anyway**. If macOS calls the app damaged, run `xattr -cr "/Applications/Notion Oracle.app"` then `codesign --force --deep --sign - "/Applications/Notion Oracle.app"`. See [INSTALL.md](../INSTALL.md).
 - **Windows:** SmartScreen shows "unknown publisher" the first time; click **More info → Run anyway**.
 
 **From source:**
