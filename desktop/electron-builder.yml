@@ -1,0 +1,31 @@
+appId: com.notionoracle.desktop
+productName: Notion Oracle
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+asarUnpack:
+  - dist/mcp/**
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Unsigned: users open it once via right-click → Open (see README).
+  identity: null
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: build/icon.png
+  category: Utility
+  target: [AppImage]
+publish: null

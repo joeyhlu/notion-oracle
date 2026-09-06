@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <title>Notion Oracle</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="collapsed">
+  <button id="pill" class="pill" title="Open Oracle">◎</button>
+
+  <div id="panel" class="panel">
+    <header class="header">
+      <div class="title"><span class="dot"></span>Oracle</div>
+      <span id="brain-label" class="model"></span>
+      <button class="icon-btn" id="btn-new" title="New conversation">✚</button>
+      <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
+      <button class="icon-btn" id="btn-collapse" title="Collapse">✕</button>
+    </header>
+
+    <!-- Chat view -->
+    <section id="view-chat" class="view">
+      <div id="looking-at" class="looking-at" hidden></div>
+      <div id="messages" class="messages"></div>
+      <div class="quick" id="quick"></div>
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Ask about the page you're on, or tell Oracle what to do…"></textarea>
+        <button id="send" class="send">Send</button>
+      </div>
+      <div class="hint">Enter to send · Shift+Enter for a new line · Esc to collapse</div>
+    </section>
+
+    <!-- Setup / settings view -->
+    <section id="view-setup" class="view setup" hidden>
+      <h2>1. Your AI account</h2>
+      <p class="muted">Oracle runs on the AI tool you are already signed in to, so it uses your subscription and never an API key.</p>
+      <div class="row">
+        <label class="radio"><input type="radio" name="brain" value="claude"> Claude <span class="muted">(Claude Pro/Max via Claude Code)</span></label>
+        <label class="radio"><input type="radio" name="brain" value="codex"> ChatGPT <span class="muted">(Plus/Pro via Codex CLI)</span></label>
+      </div>
+      <div id="brain-status" class="status-card">
+        <div class="status-line"><span id="status-icon">…</span> <span id="status-text">Checking…</span></div>
+        <div class="status-actions">
+          <button id="btn-install" class="chip">Install…</button>
+          <button id="btn-signin" class="chip">Sign in</button>
+          <button id="btn-recheck" class="chip">Re-check</button>
+        </div>
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <label>Path to executable (leave blank to auto-detect)<input type="text" id="cli-path" placeholder="/opt/homebrew/bin/claude"></label>
+          <label>Model override<input type="text" id="model" placeholder="default"></label>
+        </details>
+      </div>
+      <div id="install-help" class="install-help" hidden>
+        <p>Install with one of these, then sign in and click Re-check:</p>
+        <pre id="install-cmd-native"></pre>
+        <pre id="install-cmd-npm"></pre>
+        <p class="muted">Sign-in opens your terminal and runs the tool's login command, which uses your existing subscription.</p>
+      </div>
+
+      <h2>2. Connect Notion</h2>
+      <p class="muted">A Notion integration token lets Oracle search, read and write your workspace. Edits show up in the Notion app instantly.</p>
+      <ol class="steps">
+        <li>Open <a href="https://www.notion.so/profile/integrations" data-external>notion.so/profile/integrations</a>, create an <strong>internal</strong> integration with read, update and insert capabilities.</li>
+        <li>Paste its <em>Internal Integration Secret</em> here.</li>
+        <li>In Notion, open the top-level pages Oracle should reach → <strong>•••</strong> → <strong>Connections</strong> → add the integration. Everything nested under a shared page is included.</li>
+      </ol>
+      <label>Integration secret<input type="password" id="notion-token" placeholder="ntn_… or secret_…"></label>
+      <div class="status-actions"><button id="btn-test-notion" class="chip">Test Notion</button> <span id="notion-status" class="muted"></span></div>
+
+      <h2>3. Preferences <span class="badge">optional</span></h2>
+      <label>Always tell Oracle…<textarea id="custom-instructions" rows="2" placeholder="e.g. My tasks live in the Tasks database. Reply in French."></textarea></label>
+      <label>Shortcut<input type="text" id="hotkey" placeholder="CommandOrControl+Shift+Space"></label>
+
+      <div class="setup-footer">
+        <button id="btn-save" class="send">Save &amp; start</button>
+        <span id="save-status" class="muted"></span>
+        <button id="btn-quit" class="chip quit">Quit Oracle</button>
+      </div>
+    </section>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
