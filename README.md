@@ -15,6 +15,8 @@ Both share the same Notion tool layer (`extension/src/lib/`): search, read pages
 
 ## Desktop app — quick start
 
+> **New to this?** [`INSTALL.md`](INSTALL.md) is a click-by-click walkthrough of the four steps below, including the unsigned-app warning and a set of test prompts to run in order.
+
 1. **Download** the installer for your OS from the [Releases](../../releases) page (`.dmg` for Mac, `.exe` for Windows). Or build it yourself: `cd desktop && npm install && npm run dist`.
 2. **Install the AI tool you already pay for**, if you haven't:
    - Claude: [Claude Code](https://code.claude.com/docs/en/quickstart) — `curl -fsSL https://claude.ai/install.sh | bash` (Mac) or `irm https://claude.ai/install.ps1 | iex` (Windows PowerShell), then `claude auth login`.
