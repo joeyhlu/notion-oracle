@@ -1,0 +1,51 @@
+name: Build desktop installers
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: "desktop/release/*.dmg"
+          - os: windows-latest
+            artifact: "desktop/release/*.exe"
+          - os: ubuntu-latest
+            artifact: "desktop/release/*.AppImage"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npx electron-builder --publish never
+        env:
+          # Unsigned builds; see README for the one-time Gatekeeper / SmartScreen step.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notion-oracle-${{ matrix.os }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}

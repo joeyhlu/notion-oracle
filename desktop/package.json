@@ -1,0 +1,23 @@
+{
+  "name": "notion-oracle-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Notion Oracle: an AI overlay for the Notion desktop app, powered by your own Claude Code or Codex sign-in.",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "dist": "npm run build && electron-builder",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}
