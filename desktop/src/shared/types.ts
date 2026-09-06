@@ -12,6 +12,8 @@ export interface Settings {
   model: string;
   hotkey: string;
   customInstructions: string;
+  /** Show the overlay only while the Notion app is in the foreground. */
+  followNotion: boolean;
   setupComplete: boolean;
 }
 
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   model: "",
   hotkey: "CommandOrControl+Shift+Space",
   customInstructions: "",
+  followNotion: true,
   setupComplete: false,
 };
 

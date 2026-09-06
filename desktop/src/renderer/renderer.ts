@@ -215,6 +215,7 @@ async function loadSetupForm(): Promise<void> {
   $<HTMLInputElement>("notion-token").value = settings.notionToken;
   $<HTMLTextAreaElement>("custom-instructions").value = settings.customInstructions;
   $<HTMLInputElement>("hotkey").value = settings.hotkey;
+  $<HTMLInputElement>("follow-notion").checked = settings.followNotion;
   $("save-status").textContent = "";
   await checkBrain();
 }
@@ -245,6 +246,7 @@ async function saveSetup(): Promise<void> {
     notionToken: $<HTMLInputElement>("notion-token").value.trim(),
     customInstructions: $<HTMLTextAreaElement>("custom-instructions").value,
     hotkey: $<HTMLInputElement>("hotkey").value.trim() || "CommandOrControl+Shift+Space",
+    followNotion: $<HTMLInputElement>("follow-notion").checked,
     setupComplete: true,
   };
   const cliPath = $<HTMLInputElement>("cli-path").value.trim();

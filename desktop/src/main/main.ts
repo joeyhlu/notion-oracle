@@ -10,6 +10,7 @@ import { ClaudeBrain } from "./brains/claude.ts";
 import { CodexBrain } from "./brains/codex.ts";
 import type { Brain, McpServerSpec } from "./brains/types.ts";
 import { checkBrain, resolveCli } from "./cli.ts";
+import { FrontmostWatcher, isNotionApp, resetFrontmostSupport, shouldShowOverlay, type FrontmostSample } from "./frontmost.ts";
 import { getNotionWindowTitle } from "./notion-window.ts";
 import { buildSystemPrompt, buildUserTurn } from "./prompt.ts";
 import { SettingsStore } from "./settings.ts";
@@ -26,6 +27,10 @@ let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let mode: OverlayMode = "collapsed";
 let activeRun: AbortController | null = null;
+let frontmost: FrontmostSample = { name: null, supported: true };
+let watcher: FrontmostWatcher | null = null;
+/** Set while the user explicitly opened the panel, so it survives Oracle briefly losing focus. */
+let pinnedOpen = false;
 const brains: Record<BrainId, Brain> = { claude: new ClaudeBrain(), codex: new CodexBrain() };
 
 function placeWindow(target: { width: number; height: number }): void {
@@ -40,14 +45,51 @@ function placeWindow(target: { width: number; height: number }): void {
   });
 }
 
+/** Show or hide the overlay based on the foreground app, without touching the collapsed/expanded mode. */
+function applyVisibility(): void {
+  if (!win) return;
+  const show =
+    pinnedOpen ||
+    shouldShowOverlay({
+      followNotion: settings.get().followNotion,
+      detectionSupported: frontmost.supported,
+      frontmostApp: frontmost.name,
+      oracleFocused: win.isFocused(),
+    });
+  if (show && !win.isVisible()) win.showInactive();
+  else if (!show && win.isVisible()) win.hide();
+}
+
 function setMode(next: OverlayMode): void {
   mode = next;
   placeWindow(next === "expanded" ? EXPANDED : COLLAPSED);
   win?.webContents.send("oracle:mode", next);
+  // An expanded panel stays put until the user closes it; collapsing hands control back to
+  // foreground tracking so the pill disappears when they leave Notion.
+  pinnedOpen = next === "expanded";
   if (next === "expanded") {
     win?.show();
     win?.focus();
+  } else {
+    applyVisibility();
   }
+}
+
+function startFrontmostWatcher(): void {
+  watcher?.stop();
+  watcher = new FrontmostWatcher({
+    onChange: (sample) => {
+      frontmost = sample;
+      // Leaving Notion for another app closes the panel rather than leaving it floating.
+      if (mode === "expanded" && sample.supported && sample.name !== null && !isNotionApp(sample.name) && !win?.isFocused()) {
+        pinnedOpen = false;
+        setMode("collapsed");
+        return;
+      }
+      applyVisibility();
+    },
+  });
+  watcher.start();
 }
 
 function createWindow(): void {
@@ -70,11 +112,13 @@ function createWindow(): void {
     return { action: "deny" };
   });
   void win.loadFile(join(__dirname, "../renderer/index.html"));
+  win.on("focus", () => applyVisibility());
+  win.on("blur", () => applyVisibility());
   win.once("ready-to-show", () => {
     placeWindow(COLLAPSED);
-    win?.show();
-    // First launch: open straight into setup.
+    // First launch: open straight into setup, regardless of what is in the foreground.
     if (!settings.get().setupComplete) setMode("expanded");
+    else applyVisibility();
   });
   win.on("closed", () => (win = null));
 }
@@ -87,8 +131,18 @@ function createTray(): void {
   const refreshMenu = () => {
     const menu = Menu.buildFromTemplate([
       { label: "Open Oracle", click: () => setMode("expanded") },
-      { label: "Hide overlay", click: () => win?.hide() },
-      { label: "Show overlay", click: () => win?.show() },
+      {
+        label: "Only show over Notion",
+        type: "checkbox",
+        checked: settings.get().followNotion,
+        click: (item) => {
+          settings.update({ followNotion: item.checked });
+          resetFrontmostSupport();
+          startFrontmostWatcher();
+          applyVisibility();
+          refreshMenu();
+        },
+      },
       { type: "separator" },
       { label: "Start at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
       { label: `Shortcut: ${settings.get().hotkey.replace("CommandOrControl", process.platform === "darwin" ? "⌘" : "Ctrl")}`, enabled: false },
@@ -105,7 +159,12 @@ function registerHotkey(): void {
   globalShortcut.unregisterAll();
   const accelerator = settings.get().hotkey || DEFAULT_SETTINGS.hotkey;
   try {
-    globalShortcut.register(accelerator, () => setMode(mode === "expanded" ? "collapsed" : "expanded"));
+    globalShortcut.register(accelerator, () => {
+      // The hotkey is the escape hatch: it opens the panel even when the overlay is hidden
+      // because Notion is not in front.
+      if (mode === "expanded" && win?.isVisible()) setMode("collapsed");
+      else setMode("expanded");
+    });
   } catch {
     // Invalid accelerator; the tray still works.
   }
@@ -175,6 +234,11 @@ function registerIpc(): void {
   ipcMain.handle("oracle:save-settings", (_e, patch: Partial<Settings>) => {
     const next = settings.update(patch);
     registerHotkey();
+    if (patch.followNotion !== undefined) {
+      resetFrontmostSupport();
+      startFrontmostWatcher();
+    }
+    applyVisibility();
     return next;
   });
   ipcMain.handle("oracle:check-brain", (_e, brain: BrainId, pathOverride?: string) => checkBrain(brain, pathOverride));
@@ -215,8 +279,12 @@ if (!gotLock) {
     createWindow();
     createTray();
     registerHotkey();
+    startFrontmostWatcher();
   });
   // Keep running in the tray when the overlay window is closed.
   app.on("window-all-closed", () => undefined);
-  app.on("will-quit", () => globalShortcut.unregisterAll());
+  app.on("will-quit", () => {
+    globalShortcut.unregisterAll();
+    watcher?.stop();
+  });
 }

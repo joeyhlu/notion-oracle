@@ -31,7 +31,9 @@ The app opens the setup screen on first launch.
 
 ## Use
 
-- **⌘⇧Space** / **Ctrl⇧Space**, the ◎ pill in the corner, or the tray/menu-bar icon opens the panel. Esc collapses it.
+- The ◎ pill appears only while the Notion app is in front, so it stays out of your way everywhere else. Turn that off with **Only show over Notion** in the tray menu or in settings.
+- **⌘⇧Space** / **Ctrl⇧Space** opens the panel from anywhere, even while the pill is hidden. The tray/menu-bar icon works too. Esc collapses it.
+- A panel opened over Notion closes itself when you switch to another app; one you opened deliberately from elsewhere stays put.
 - The header shows **Looking at: <page>** when the Notion app is in front, so "this page" just works.
 - Try: "Summarize this page", "What's on my calendar this week?", "Add *Dentist* on Sept 12 at 2pm to my Calendar", "Create a page under this one called Q4 Plan with an outline", "Turn this page into a to-do list and add it to the end".
 - Each tool call shows as a small chip while it runs. **Stop** cancels a turn. **✚** starts a new conversation; **⚙** reopens settings.

@@ -122,7 +122,8 @@ Run these in order. Each builds on the last, so the first one that fails tells y
 
 | Symptom | Fix |
 |---|---|
-| Hotkey does nothing | Another app claimed it. Use the ◎ pill, or the menu-bar / system-tray icon. Rebind in settings. |
+| Hotkey does nothing | Another app claimed it. Use the menu-bar / system-tray icon. Rebind in settings. |
+| ◎ pill never appears | It only shows while Notion is in front. If it stays hidden even in Notion, untick **Only show over Notion** in the tray menu — on macOS the foreground check can need Accessibility permission. |
 | "Not signed in" | Run `claude auth login` (or `codex login`) in a terminal again, then **Re-check**. |
 | "I can't find that page" | The Settings → Connections sharing step. |
 | Test Notion sees zero pages | Same — the integration has not been added to any page. |
