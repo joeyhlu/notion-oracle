@@ -269,10 +269,12 @@ async function saveSetup(): Promise<void> {
 
 // ---------- Wiring ----------
 
-async function main(): Promise<void> {
-  platform = await window.oracle.platform();
-  settings = await window.oracle.getSettings();
-  $("brain-label").textContent = BRAIN_LABELS[settings.brain];
+/**
+ * Attaches every control synchronously. This runs before any IPC: when the pill's listener was
+ * registered after awaiting settings, a slow or failed round-trip left the button doing nothing
+ * while the rest of the window looked fine.
+ */
+function wireControls(): void {
   renderEmpty();
   for (const action of QUICK_ACTIONS) {
     const chip = el("button", "chip", action) as HTMLButtonElement;
@@ -299,7 +301,11 @@ async function main(): Promise<void> {
     input.style.height = `${Math.min(160, input.scrollHeight)}px`;
   });
   $("send").addEventListener("click", () => (busy ? void window.oracle.chatAbort() : void send(input.value)));
-  $("pill").addEventListener("click", () => void window.oracle.setMode("expanded"));
+  const pill = $("pill");
+  const openPanel = () => void window.oracle.setMode("expanded");
+  pill.addEventListener("click", openPanel);
+  // mousedown too: it fires earlier, so the panel still opens if anything swallows the click.
+  pill.addEventListener("mousedown", openPanel);
   $("btn-collapse").addEventListener("click", () => void window.oracle.setMode("collapsed"));
   $("btn-new").addEventListener("click", resetConversation);
   $("btn-settings").addEventListener("click", () => showView($("view-setup").hidden ? "setup" : "chat"));
@@ -337,7 +343,18 @@ async function main(): Promise<void> {
   window.oracle.onChatEvent(handleEvent);
   window.oracle.onMode(applyMode);
   applyMode("collapsed");
+}
+
+/** Everything that needs the main process. Kept separate so a failure here cannot disable the UI. */
+async function loadState(): Promise<void> {
+  platform = await window.oracle.platform();
+  settings = await window.oracle.getSettings();
+  $("brain-label").textContent = BRAIN_LABELS[settings.brain];
   showView(settings.setupComplete ? "chat" : "setup");
 }
 
-void main();
+wireControls();
+void loadState().catch((error) => {
+  console.error("Oracle: could not load settings", error);
+  $("brain-label").textContent = "Settings unavailable";
+});

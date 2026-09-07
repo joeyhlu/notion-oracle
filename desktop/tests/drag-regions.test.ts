@@ -27,6 +27,15 @@ test("the collapsed pill is clickable, not a drag region", () => {
   assert.equal(appRegion(".pill"), "no-drag");
 });
 
+test("nothing in the collapsed overlay is a drag region", () => {
+  // -webkit-app-region is inherited, so a draggable ancestor can swallow the pill's clicks even
+  // though the pill itself says no-drag. Only the expanded panel's header may be draggable.
+  const draggable = [...css.matchAll(/(?:^|\})\s*([^{}]+)\{([^}]*)\}/g)]
+    .filter((m) => /-webkit-app-region:\s*drag/.test(m[2] ?? ""))
+    .map((m) => (m[1] ?? "").trim());
+  assert.deepEqual(draggable, [".header"], `unexpected drag regions: ${draggable.join(", ")}`);
+});
+
 test("interactive controls inside the draggable header opt out of dragging", () => {
   assert.equal(appRegion(".header"), "drag");
   assert.equal(appRegion(".header button"), "no-drag");
