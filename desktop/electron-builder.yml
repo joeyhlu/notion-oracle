@@ -25,6 +25,13 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # macOS refuses Apple Events and calendar access unless the app declares why it wants them;
+  # without these strings the permission prompt never appears and the request is denied outright.
+  extendInfo:
+    NSAppleEventsUsageDescription: Notion Oracle sends Apple Events to the Calendar app to read and create your events, and to the Notion apps to see which page you are on.
+    NSCalendarsUsageDescription: Notion Oracle reads and creates events in your calendar when you ask it to.
+    NSCalendarsFullAccessUsageDescription: Notion Oracle reads, creates, changes and deletes events in your calendar when you ask it to.
+    NSSystemAdministrationUsageDescription: Notion Oracle uses automation to control the Notion Calendar app when the system calendar is unavailable.
 win:
   icon: build/icon.png
   target:

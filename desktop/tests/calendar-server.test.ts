@@ -38,7 +38,7 @@ function toolCallResult(reply: JsonRpcReply): { isError: boolean; content: Array
   return reply.result as { isError: boolean; content: Array<{ type: string; text: string }> };
 }
 
-test("initialize and tools/list expose exactly the four calendar tools, each with an input schema", async () => {
+test("initialize and tools/list expose this platform's calendar tools, each with an input schema", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
   await srv.handle({ jsonrpc: "2.0", id: 2, method: "tools/list" });
@@ -47,10 +47,11 @@ test("initialize and tools/list expose exactly the four calendar tools, each wit
   assert.equal(replies.get(1)!.result!.protocolVersion, "2025-06-18");
 
   const tools = replies.get(2)!.result!.tools as Array<{ name: string; inputSchema: unknown }>;
-  assert.deepEqual(
-    tools.map((t) => t.name),
-    ["calendar_status", "calendar_open", "calendar_open_date", "calendar_create_event"],
-  );
+  const names = tools.map((t) => t.name);
+  assert.deepEqual(names, CALENDAR_TOOLS.map((t) => t.name));
+  // The keystroke fallback exists everywhere; the scriptable system-calendar tools are macOS-only.
+  assert.ok(names.includes("calendar_create_event_by_keystrokes"));
+  assert.equal(names.includes("calendar_create_event"), process.platform === "darwin");
   assert.ok(
     tools.every((t) => t.inputSchema && typeof t.inputSchema === "object"),
     "every tool must carry an inputSchema",
@@ -63,25 +64,37 @@ test("initialize and tools/list expose exactly the four calendar tools, each wit
 const EXPECTED_METHOD = process.platform === "darwin" ? "applescript" : process.platform === "win32" ? "powershell" : "unsupported";
 const APP_UNREACHABLE = /is not running|only supported on macOS and Windows/;
 
-test("calendar_status reports the platform's control method and that the app is not running", async () => {
+test("calendar_status reports both backends and how each is set up", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "calendar_status", arguments: {} } });
 
   const call = toolCallResult(repliesById(lines).get(1)!);
   assert.equal(call.isError, false);
-  const status = JSON.parse(call.content[0]!.text) as { running: boolean; platform: string; method: string };
-  assert.equal(status.platform, process.platform);
-  assert.equal(status.method, EXPECTED_METHOD);
-  assert.equal(status.running, false);
+  const status = JSON.parse(call.content[0]!.text) as {
+    default_backend: string;
+    notion_calendar_app: { running: boolean; platform: string; method: string };
+    system_calendar: { available: boolean; reason?: string };
+  };
+  assert.equal(status.notion_calendar_app.platform, process.platform);
+  assert.equal(status.notion_calendar_app.running, false);
+  if (process.platform === "darwin") {
+    assert.equal(status.default_backend, "system-calendar");
+  } else {
+    // Only macOS has a scriptable system calendar, so elsewhere the keystroke path is the default
+    // and the status explains why the better one is missing.
+    assert.equal(status.default_backend, "notion-app-keystrokes");
+    assert.equal(status.system_calendar.available, false);
+    assert.match(status.system_calendar.reason ?? "", /macOS/);
+  }
 });
 
-test("calendar_create_event reports a bad date as a bad date, even when the app cannot be reached", async () => {
+test("the keystroke fallback reports a bad date as a bad date, even when the app cannot be reached", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({
     jsonrpc: "2.0",
     id: 1,
     method: "tools/call",
-    params: { name: "calendar_create_event", arguments: { title: "Dentist", start: "not-a-date" } },
+    params: { name: "calendar_create_event_by_keystrokes", arguments: { title: "Dentist", start: "not-a-date" } },
   });
 
   const call = toolCallResult(repliesById(lines).get(1)!);
@@ -91,13 +104,13 @@ test("calendar_create_event reports a bad date as a bad date, even when the app 
   assert.match(call.content[0]!.text, /ISO 8601/);
 });
 
-test("calendar_create_event with valid input stops at the app check when the app is unreachable", async () => {
+test("the keystroke fallback stops at the app check when the app is unreachable", async () => {
   const { srv, lines } = makeServer();
   await srv.handle({
     jsonrpc: "2.0",
     id: 1,
     method: "tools/call",
-    params: { name: "calendar_create_event", arguments: { title: "Dentist", start: "2026-09-07T14:00:00" } },
+    params: { name: "calendar_create_event_by_keystrokes", arguments: { title: "Dentist", start: "2026-09-07T14:00:00" } },
   });
   const call = toolCallResult(repliesById(lines).get(1)!);
   assert.equal(call.isError, true);

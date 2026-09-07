@@ -20,6 +20,11 @@ export interface Settings {
   calendarAutoSave: boolean;
   /** How to drive the app: jump-to-day + C, or the Cmd+K natural-language command bar. */
   calendarStrategy: "new-event-key" | "command-bar";
+  /**
+   * "system" scripts the macOS Calendar app: real create/read/update/delete against the user's
+   * account. "notion-app" falls back to typing into Notion Calendar, which cannot read anything.
+   */
+  calendarBackend: "system" | "notion-app";
   setupComplete: boolean;
 }
 
@@ -35,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarAutomation: true,
   calendarAutoSave: false,
   calendarStrategy: "new-event-key",
+  calendarBackend: "system",
   setupComplete: false,
 };
 

@@ -15,5 +15,10 @@
   <!-- The app spawns the AI CLI and its own binary as a Node process for the Notion tool server. -->
   <key>com.apple.security.inherit</key>
   <true/>
+  <!-- Required to script the Calendar app and the Notion apps via Apple Events. -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+  <key>com.apple.security.personal-information.calendars</key>
+  <true/>
 </dict>
 </plist>

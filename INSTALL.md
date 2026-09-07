@@ -98,12 +98,11 @@ Prefer ChatGPT? Select it instead; it needs the [Codex CLI](https://developers.o
 
 Custom instructions, the keyboard shortcut, and the overlay behaviour.
 
-### 4. Notion Calendar (optional, experimental)
+### 4. Your calendar (optional)
 
-If your calendar lives in the **Notion Calendar app** (Google, iCloud or Outlook accounts) rather than in a Notion database, Oracle can still add events to it - by operating the app the way you would, since it has no API. Leave **Let Oracle control the Notion Calendar app** on, keep the app open when you ask for events, and on macOS grant Notion Oracle **Accessibility** permission when prompted (System Settings → Privacy & Security → Accessibility). By default the new event is left open for you to press Enter. See [`desktop/CALENDAR.md`](desktop/CALENDAR.md).
+To let Oracle read and change your real calendar, add your Google, iCloud or Outlook account in **System Settings → General → Internet Accounts** and tick **Calendars**. The first time you ask Oracle something calendar-related, macOS asks whether it may control Calendar — allow it, and grant **Full Access** if it also asks about Calendars.
 
-
-Then click **Save & start**.
+Then "what's on my calendar this week?", "add dentist Sept 12 at 2pm" and "move my 3pm to Thursday" all work, and the events appear in Notion Calendar. Without that account Oracle falls back to typing into the Notion Calendar app, which can only create events. See [`desktop/CALENDAR.md`](desktop/CALENDAR.md).
 
 ---
 
