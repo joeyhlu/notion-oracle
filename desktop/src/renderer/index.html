@@ -75,8 +75,14 @@
       <p class="muted" id="follow-note">Keeps the ◎ button off your screen in every other app. The keyboard shortcut still opens Oracle from anywhere.</p>
 
       <h2>4. Notion Calendar <span class="badge">experimental</span></h2>
-      <p class="muted">Your Google, iCloud or Outlook calendar shown in the Notion Calendar app has no API, so Oracle creates events by operating the app itself: it brings it to the front, jumps to the day, opens a new event and types the title. The app must be open. On macOS, Notion Oracle needs Accessibility permission (System Settings → Privacy &amp; Security → Accessibility).</p>
-      <label class="checkbox"><input type="checkbox" id="calendar-automation"> Let Oracle control the Notion Calendar app</label>
+      <p class="muted">Add your Google, iCloud or Outlook account in <strong>System Settings → Internet Accounts</strong> and Oracle can read and change your real calendar directly through the macOS Calendar app — the same events you see in Notion Calendar. macOS will ask you to approve Notion Oracle the first time. Without that account, Oracle falls back to typing into the Notion Calendar app, which can only create events and cannot read anything back.</p>
+      <label class="checkbox"><input type="checkbox" id="calendar-automation"> Let Oracle work with your calendar</label>
+      <label>How to reach your calendar
+        <select id="calendar-backend">
+          <option value="system">macOS Calendar app (recommended: read, create, edit and delete)</option>
+          <option value="notion-app">Type into the Notion Calendar app (create only, no reading)</option>
+        </select>
+      </label>
       <label class="checkbox"><input type="checkbox" id="calendar-autosave"> Save events automatically (otherwise the new event is left open for you to press Enter)</label>
       <label>How to create events
         <select id="calendar-strategy">

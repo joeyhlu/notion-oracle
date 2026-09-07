@@ -7,7 +7,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
-  "Add an event to my calendar…",
+  "What\u2019s on my calendar this week?",
   "Turn this page into a to-do list and add it to the end",
   "Create a page under this one with an outline for…",
 ];
@@ -219,6 +219,7 @@ async function loadSetupForm(): Promise<void> {
   $<HTMLInputElement>("calendar-automation").checked = settings.calendarAutomation;
   $<HTMLInputElement>("calendar-autosave").checked = settings.calendarAutoSave;
   $<HTMLSelectElement>("calendar-strategy").value = settings.calendarStrategy;
+  $<HTMLSelectElement>("calendar-backend").value = settings.calendarBackend;
   $("save-status").textContent = "";
   await checkBrain();
 }
@@ -253,6 +254,7 @@ async function saveSetup(): Promise<void> {
     calendarAutomation: $<HTMLInputElement>("calendar-automation").checked,
     calendarAutoSave: $<HTMLInputElement>("calendar-autosave").checked,
     calendarStrategy: $<HTMLSelectElement>("calendar-strategy").value === "command-bar" ? "command-bar" : "new-event-key",
+    calendarBackend: $<HTMLSelectElement>("calendar-backend").value === "notion-app" ? "notion-app" : "system",
     setupComplete: true,
   };
   const cliPath = $<HTMLInputElement>("cli-path").value.trim();

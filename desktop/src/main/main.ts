@@ -203,7 +203,7 @@ function mcpSpecs(current: Settings): McpServerSpec[] {
       name: "calendar",
       command: process.execPath,
       args: [serverScriptPath("calendar-server.js")],
-      env: { ...NODE_ENV, CALENDAR_AUTO_SAVE: current.calendarAutoSave ? "1" : "0", CALENDAR_STRATEGY: current.calendarStrategy },
+      env: { ...NODE_ENV, CALENDAR_AUTO_SAVE: current.calendarAutoSave ? "1" : "0", CALENDAR_STRATEGY: current.calendarStrategy, CALENDAR_BACKEND: current.calendarBackend },
       toolNames: [...CALENDAR_TOOL_NAMES],
     });
   }

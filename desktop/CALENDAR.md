@@ -1,33 +1,50 @@
-# Notion Calendar control
+# Calendar control
 
-Notion Oracle can put events on your real calendar — Google, iCloud or Outlook — by driving the **Notion Calendar** desktop app the way a person would: bringing it to the front, jumping to the right day, opening a new event and typing the title. This is keystroke automation, not an integration: Notion Calendar has no API, no AppleScript dictionary, and its only deep link (`cron://`) opens events that already exist, not new ones. There's no other way to create an event on your behalf.
+Oracle can read and change your real calendar — the Google, iCloud or Outlook account you see in the Notion Calendar app.
 
-## Requirements
+There are two ways it can do that, and the difference matters.
 
-- **Notion Calendar must already be open.** Oracle checks this before doing anything and will ask you to open it rather than retrying blindly.
-- **On macOS, Notion Oracle needs Accessibility permission** to send keystrokes to another app: **System Settings → Privacy & Security → Accessibility**, enable Notion Oracle. Windows needs no extra permission.
+## The good path: the macOS Calendar app (default)
 
-## Default behavior
+macOS Calendar is scriptable. If your account is added to macOS, Oracle talks to it directly and gets everything: reading your schedule, creating events, moving them, renaming them, deleting them. Changes sync to your account and appear in Notion Calendar like any other event.
 
-By default, Oracle leaves the new event **open and unsaved** after typing the title — you glance at it, adjust anything that looks off, and press **Enter** (or click Save) yourself. It can't read the calendar back to confirm an event landed correctly, so it never claims one exists without you confirming it.
+**Setup, once:**
 
-Turning on **auto-save** in settings makes Oracle press Enter immediately after typing. Useful once you trust it, but mistakes get saved too, so check the app afterward.
+1. **System Settings → General → Internet Accounts** → add your Google (or iCloud/Outlook) account and tick **Calendars**.
+2. Ask Oracle something calendar-related. macOS will ask whether Notion Oracle may control **Calendar** — allow it.
+3. If macOS also asks for **Calendars** access, choose **Full Access**. "Add Only" blocks reading, updating and deleting.
 
-## Two strategies
+You can check what it sees by asking *"what calendars do I have?"*.
 
-- **`new-event-key` (default).** Jumps to the target day, presses **C** (Notion Calendar's new-event shortcut) and types the title. The date is exact; the time defaults to whatever Notion Calendar picks for a new event that day, so it may need adjusting in the composer before you save.
-- **`command-bar`.** Opens the command bar (**⌘K** / **Ctrl K**) and types one natural-language line — title, date and time together, e.g. "Dentist Sep 7 2026 2pm-3:30pm". This can set the time in one step, but it depends on Notion Calendar correctly parsing that line, which occasionally misreads unusual titles or phrasing.
+**What you can ask for:**
 
-Ask for either by name ("use the command bar for this") or let Oracle pick the default.
+- *"What's on my calendar this week?"*
+- *"Add dentist on Sept 12 at 2pm"* — a bare date instead makes it all-day
+- *"Move my 3pm to Thursday"*
+- *"Delete the Friday standup"* — it will confirm first unless you named the event exactly
 
-## What it can't do
+Subscribed calendars such as *Holidays in Canada* are read-only. Oracle refuses to write to one rather than silently putting your event somewhere else.
 
-- **Read your calendar back.** Oracle can't see what's on it or verify an event was created correctly — only you can confirm that by looking at the app.
-- **Edit or delete existing events.** It can only create new ones.
-- **Run while Notion Calendar is closed.** There's no headless mode; the app has to be visible on screen to receive keystrokes.
+## The fallback: typing into Notion Calendar
 
-## Troubleshooting
+If you are on Windows, or you have not added your account to macOS, Oracle drives the **Notion Calendar app** with keystrokes instead: it brings the app to the front, jumps to the day, presses `C` and types the title.
 
-- **Nothing happens / a permission-looking error.** On macOS, this is almost always missing Accessibility permission — check **System Settings → Privacy & Security → Accessibility** and make sure Notion Oracle is enabled (toggle it off and back on if it's already listed).
-- **Wrong day or time.** Try the other strategy — `new-event-key` for a reliable date, `command-bar` when you need a specific time set automatically — or just fix it in the still-open composer before pressing Save.
-- **Text typed into the wrong window.** This means Notion Calendar lost focus mid-run (another window popped up, you clicked away). Bring Notion Calendar to the front and ask Oracle to try again.
+This is strictly worse and only creates events. It cannot read your calendar, cannot change or delete anything, and cannot verify what it did — so it leaves the new event open for you to press Enter. It needs **Accessibility** permission (System Settings → Privacy & Security → Accessibility) and the Notion Calendar app must be open.
+
+Switch between the two under **How to reach your calendar** in Oracle's settings.
+
+## Limits worth knowing
+
+- **Reads can lag.** macOS pulls from Google on a schedule rather than instantly, so an event added on your phone a minute ago may not show up yet. Oracle asks Calendar to refresh after every write.
+- **Deleting is real.** It goes to your actual calendar. Oracle is told to confirm first unless you named the event, but treat it with the same care as deleting it yourself.
+- **The permission prompt can reappear after an update.** These builds are ad-hoc signed rather than signed with a paid Apple Developer certificate, and macOS ties permission grants to a signing identity that changes each build. If calendar tools stop working after installing a new version, re-approve Notion Oracle under **Privacy & Security → Automation**.
+
+## When something goes wrong
+
+| Symptom | Fix |
+|---|---|
+| "macOS blocked access to Calendar" | Privacy & Security → **Automation** → allow Notion Oracle → Calendar. Check **Calendars** grants Full Access too. |
+| "Could not reach the macOS Calendar app" | Add your account in **Internet Accounts**, and open Calendar once. |
+| "No calendar named X" | Ask *"what calendars do I have?"* and use a name from that list. |
+| Event created but not in Notion Calendar | Give it a moment to sync, then refresh Notion Calendar. Check it went to the account you expected, not a local On My Mac calendar. |
+| Wrong day or time | Say what you wanted; Oracle can move it with `calendar_update_event`. Times come from your machine's timezone. |
