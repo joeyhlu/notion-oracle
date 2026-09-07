@@ -61,6 +61,32 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "calendar_set_default_calendar",
+    description:
+      "Remember which calendar new events should go to when the user does not name one. Use it when the user says something like 'use my Gmail calendar' or 'set that as the default'. The choice persists across restarts. Call calendar_list_calendars first if you are not sure of the exact name.",
+    input_schema: {
+      type: "object",
+      properties: { calendar: { type: "string", description: "Exact calendar name, from calendar_list_calendars." } },
+      required: ["calendar"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "calendar_move_event",
+    description:
+      "Move an existing event to a different calendar. Use this when an event landed in the wrong calendar. It recreates the event in the target calendar and removes the original, so the event gets a new uid, which this returns.",
+    input_schema: {
+      type: "object",
+      properties: {
+        uid: { type: "string", description: "Event uid from calendar_list_events." },
+        from_calendar: { type: "string", description: "Calendar the event is currently in." },
+        to_calendar: { type: "string", description: "Calendar to move it to." },
+      },
+      required: ["uid", "from_calendar", "to_calendar"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "calendar_update_event",
     description: "Change an existing event: retitle it, move it to another time, or set its location or notes. Find the event with calendar_list_events first to get its uid and calendar. Only the fields you pass are changed.",
     input_schema: {
@@ -154,7 +180,15 @@ async function status(): Promise<Record<string, unknown>> {
   if (!SYSTEM_CALENDAR) return { ...base, system_calendar: { available: false, reason: process.platform === "darwin" ? "Disabled in settings." : "Only macOS exposes a scriptable system calendar." } };
   try {
     const calendars = await mac.listCalendars();
-    return { ...base, system_calendar: { available: true, calendars: calendars.map((c) => ({ name: c.name, writable: c.writable })) } };
+    const saved = mac.readDefaultCalendar();
+    return {
+      ...base,
+      system_calendar: {
+        available: true,
+        calendars: calendars.map((c) => ({ name: c.name, writable: c.writable })),
+        default_calendar: saved || `${mac.pickDefaultCalendar(calendars)?.name ?? "none"} (auto-chosen; use calendar_set_default_calendar to fix it)`,
+      },
+    };
   } catch (error) {
     return { ...base, system_calendar: { available: false, reason: error instanceof Error ? error.message : String(error) } };
   }
@@ -194,6 +228,16 @@ export const execute: ToolExecutor = async (name, input) => {
           notes: input.notes ? String(input.notes) : undefined,
         });
         return ok({ created: true, ...created, note: `Added to "${created.calendar}". It syncs to the account and will appear in ${APP_NAME} shortly.` });
+      }
+
+      case "calendar_set_default_calendar": {
+        const chosen = await mac.setDefaultCalendar(String(input.calendar ?? ""));
+        return ok({ default_calendar: chosen, note: `New events go to "${chosen}" unless the user names another calendar.` });
+      }
+
+      case "calendar_move_event": {
+        const moved = await mac.moveEvent(String(input.uid ?? ""), String(input.from_calendar ?? ""), String(input.to_calendar ?? ""));
+        return ok({ moved: true, ...moved, note: "The event was recreated in the target calendar, so its uid changed." });
       }
 
       case "calendar_update_event": {
