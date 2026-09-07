@@ -34,3 +34,15 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm run check
+
+      # Renders the panel in a real browser. The unit tests read the stylesheet and cannot see
+      # that the page *looks* right: 0.3.0 shipped with all three views drawn on top of each
+      # other and every test green.
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/smoke.mjs --out screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: panel-screenshots
+          path: desktop/screenshots
+          if-no-files-found: warn

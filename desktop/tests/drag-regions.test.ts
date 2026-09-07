@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { rules, ruleBody } from "./css-rules.ts";
 
 /**
  * Guards a bug that functional tests cannot see: an element with -webkit-app-region: drag is
@@ -9,16 +8,6 @@ import { join } from "node:path";
  * injects synthetic input below that layer, so a clicked-and-it-worked test still passes while
  * the real app has a dead button. These assertions read the stylesheet instead.
  */
-const css = readFileSync(join(import.meta.dirname, "..", "src", "renderer", "styles.css"), "utf8");
-
-/** Returns the declarations of the first rule whose selector list matches exactly. */
-function ruleBody(selector: string): string {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`, "m").exec(css);
-  assert.ok(match, `no CSS rule found for "${selector}"`);
-  return match![1] ?? "";
-}
-
 function appRegion(selector: string): string | null {
   return /-webkit-app-region:\s*([a-z-]+)/.exec(ruleBody(selector))?.[1] ?? null;
 }
@@ -30,9 +19,9 @@ test("the collapsed pill is clickable, not a drag region", () => {
 test("nothing in the collapsed overlay is a drag region", () => {
   // -webkit-app-region is inherited, so a draggable ancestor can swallow the pill's clicks even
   // though the pill itself says no-drag. Only the expanded panel's header may be draggable.
-  const draggable = [...css.matchAll(/(?:^|\})\s*([^{}]+)\{([^}]*)\}/g)]
-    .filter((m) => /-webkit-app-region:\s*drag/.test(m[2] ?? ""))
-    .map((m) => (m[1] ?? "").trim());
+  const draggable = rules
+    .filter((r) => /-webkit-app-region:\s*drag\b/.test(r.body))
+    .map((r) => r.selector);
   assert.deepEqual(draggable, [".header"], `unexpected drag regions: ${draggable.join(", ")}`);
 });
 
