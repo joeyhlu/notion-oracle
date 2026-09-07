@@ -1,19 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  asString,
-  isDateOnly,
-  parseIso,
-  dateStatements,
-  listCalendarsScript,
-  listEventsScript,
-  createEventScript,
-  updateEventScript,
-  deleteEventScript,
-  parseCalendars,
-  parseEvents,
-  describeAppleScriptError,
-} from "../src/mcp/mac-calendar.ts";
+import { asString, createEventScript, dateStatements, deleteEventScript, describeAppleScriptError, findEventScript, isDateOnly, listCalendarsScript, listEventsScript, parseCalendars, parseEvents, parseIso, pickDefaultCalendar, scoreCalendar, updateEventScript } from "../src/mcp/mac-calendar.ts";
 
 // Field/record separators used by the AppleScript output format. Built with fromCharCode
 // (never pasted as literal control characters) to mirror how the module itself builds them.
@@ -394,4 +381,39 @@ test("describeAppleScriptError: anything else is passed through with a prefix", 
   const message = describeAppleScriptError("some unrelated stderr text");
   assert.ok(message.startsWith("Calendar scripting failed"));
   assert.ok(message.includes("some unrelated stderr text"));
+});
+
+// ---------- default calendar selection ----------
+
+test("an account calendar named after an email beats a bare local one", () => {
+  assert.ok(scoreCalendar("lujoey886@gmail.com") > scoreCalendar("Untitled"));
+  assert.ok(scoreCalendar("lujoey886@gmail.com") > scoreCalendar("Joey Work Calendar"));
+  assert.ok(scoreCalendar("Joey Work Calendar") > scoreCalendar("Untitled"));
+  assert.equal(scoreCalendar("Calendar"), scoreCalendar("Untitled"));
+  assert.equal(scoreCalendar("  "), -100);
+});
+
+test("pickDefaultCalendar skips read-only calendars and never picks Untitled over an account", () => {
+  const calendars = [
+    { name: "Untitled", writable: true, description: "" },
+    { name: "Holidays in Canada", writable: false, description: "" },
+    { name: "lujoey886@gmail.com", writable: true, description: "" },
+    { name: "Joey Work Calendar", writable: true, description: "" },
+  ];
+  assert.equal(pickDefaultCalendar(calendars)?.name, "lujoey886@gmail.com");
+  // The bug this guards: taking the first writable calendar put events in a local one that
+  // never syncs anywhere the user can see.
+  assert.notEqual(pickDefaultCalendar(calendars)?.name, "Untitled");
+});
+
+test("pickDefaultCalendar falls back to a plain name when there is no account calendar", () => {
+  assert.equal(pickDefaultCalendar([{ name: "Untitled", writable: true, description: "" }, { name: "Home", writable: true, description: "" }])?.name, "Home");
+  assert.equal(pickDefaultCalendar([{ name: "Holidays", writable: false, description: "" }]), undefined);
+});
+
+test("findEventScript targets one event by uid and returns the list record shape", () => {
+  const script = findEventScript("5AF6D260-DA6F", "lujoey886@gmail.com");
+  assert.match(script, /first event whose uid = "5AF6D260-DA6F"/);
+  assert.match(script, /tell calendar "lujoey886@gmail\.com"/);
+  assert.ok(script.includes("as «class isot» as string"));
 });

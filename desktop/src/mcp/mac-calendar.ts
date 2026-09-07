@@ -12,6 +12,8 @@
  */
 
 import { execFile } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /** Field and record separators: control characters that cannot appear in calendar text. */
 const FIELD_SEP = String.fromCharCode(31);
@@ -197,6 +199,26 @@ export function updateEventScript(input: UpdateEventInput): string {
   ].join("\n");
 }
 
+/** One event by uid, in the same record shape listEventsScript produces. */
+export function findEventScript(uid: string, calendar: string): string {
+  return [
+    `set out to ""`,
+    `set sep to (character id 31)`,
+    `set rec to (character id 30)`,
+    `tell application "Calendar"`,
+    `  tell calendar ${asString(calendar)}`,
+    `    set ev to first event whose uid = ${asString(uid)}`,
+    `    set loc to ""`,
+    `    try`,
+    `      set loc to (location of ev) as string`,
+    `    end try`,
+    `    set out to (uid of ev) & sep & ${asString(calendar)} & sep & (summary of ev) & sep & ${isoOf("start date of ev")} & sep & ${isoOf("end date of ev")} & sep & ((allday event of ev) as string) & sep & loc & rec`,
+    `  end tell`,
+    `end tell`,
+    `return out`,
+  ].join("\n");
+}
+
 export function deleteEventScript(uid: string, calendar: string): string {
   return [
     `tell application "Calendar"`,
@@ -269,22 +291,79 @@ export async function listCalendars(): Promise<CalendarInfo[]> {
 }
 
 /**
- * Picks the calendar to write to. Subscriptions such as "Holidays in Canada" are read-only and
- * must never be targeted, so an explicit request for one is refused rather than silently
- * redirected.
+ * Ranks calendars for the automatic default. A Google or iCloud account's primary calendar is
+ * named after the account address, which is almost always what someone means by "my calendar";
+ * a bare local calendar (macOS creates one called "Untitled" or "Calendar" with no account
+ * behind it) is the worst choice, because nothing there ever syncs to a phone or to Notion
+ * Calendar. Preferring the first writable one put an event somewhere the user could not see.
+ */
+export function scoreCalendar(name: string): number {
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name.trim())) return 100;
+  if (/^(untitled|calendar)$/i.test(name.trim()) || !name.trim()) return -100;
+  return 0;
+}
+
+export function pickDefaultCalendar(calendars: CalendarInfo[]): CalendarInfo | undefined {
+  const writable = calendars.filter((c) => c.writable);
+  if (!writable.length) return undefined;
+  return [...writable].sort((a, b) => scoreCalendar(b.name) - scoreCalendar(a.name))[0];
+}
+
+/**
+ * Picks the calendar to write to: an explicit request, else the user's saved default, else the
+ * best guess. Subscriptions such as "Holidays in Canada" are read-only and must never be
+ * targeted, so an explicit request for one is refused rather than silently redirected.
  */
 export async function resolveCalendar(requested?: string): Promise<string> {
   const all = await listCalendars();
   if (!all.length) throw new Error(NO_CALENDAR_APP);
-  if (requested) {
-    const exact = all.find((c) => c.name === requested) ?? all.find((c) => c.name.toLowerCase() === requested.toLowerCase());
-    if (!exact) throw new Error(`No calendar named "${requested}". Available: ${all.map((c) => `${c.name}${c.writable ? "" : " (read-only)"}`).join(", ")}`);
-    if (!exact.writable) throw new Error(`"${exact.name}" is read-only (a subscribed calendar). Pick a writable one: ${all.filter((c) => c.writable).map((c) => c.name).join(", ")}`);
-    return exact.name;
+  const wanted = requested?.trim() || readDefaultCalendar();
+  if (wanted) {
+    const exact = all.find((c) => c.name === wanted) ?? all.find((c) => c.name.toLowerCase() === wanted.toLowerCase());
+    if (!exact) {
+      // A saved default that no longer exists should not block the user; fall through to the guess.
+      if (requested?.trim()) throw new Error(`No calendar named "${wanted}". Available: ${all.map((c) => `${c.name}${c.writable ? "" : " (read-only)"}`).join(", ")}`);
+    } else if (!exact.writable) {
+      throw new Error(`"${exact.name}" is read-only (a subscribed calendar). Pick a writable one: ${all.filter((c) => c.writable).map((c) => c.name).join(", ")}`);
+    } else {
+      return exact.name;
+    }
   }
-  const writable = all.filter((c) => c.writable);
-  if (!writable.length) throw new Error("No writable calendars are set up in the macOS Calendar app. The user needs to add their account in System Settings → Internet Accounts.");
-  return writable[0]!.name;
+  const picked = pickDefaultCalendar(all);
+  if (!picked) throw new Error("No writable calendars are set up in the macOS Calendar app. The user needs to add their account in System Settings → Internet Accounts.");
+  return picked.name;
+}
+
+// ---------- remembered default ----------
+
+/**
+ * The chosen default lives beside the app's settings so it survives restarts. The MCP server is
+ * a separate short-lived process, so it reads the file on each call rather than caching it.
+ */
+function defaultCalendarFile(): string | null {
+  const dir = process.env.CALENDAR_STATE_DIR;
+  return dir ? join(dir, "calendar-default.json") : null;
+}
+
+export function readDefaultCalendar(): string {
+  const file = defaultCalendarFile();
+  if (!file) return "";
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { calendar?: string };
+    return typeof parsed.calendar === "string" ? parsed.calendar : "";
+  } catch {
+    return "";
+  }
+}
+
+export async function setDefaultCalendar(name: string): Promise<string> {
+  assertMac();
+  const resolved = await resolveCalendar(name);
+  const file = defaultCalendarFile();
+  if (!file) throw new Error("Nowhere to save the default calendar; restart Notion Oracle and try again.");
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify({ calendar: resolved }, null, 2));
+  return resolved;
 }
 
 export async function listEvents(from: string, to: string, calendar?: string): Promise<CalendarEvent[]> {
@@ -307,6 +386,30 @@ export async function createEvent(input: CreateEventInput): Promise<{ uid: strin
 export async function updateEvent(input: UpdateEventInput): Promise<void> {
   assertMac();
   await runAppleScript(updateEventScript({ ...input, calendar: await resolveCalendar(input.calendar) }));
+}
+
+/**
+ * Moves an event between calendars. AppleScript cannot reassign an event's calendar, so this
+ * copies it across and deletes the original - which means a new uid.
+ */
+export async function moveEvent(uid: string, fromCalendar: string, toCalendar: string): Promise<{ uid: string; calendar: string }> {
+  assertMac();
+  const source = await resolveCalendar(fromCalendar);
+  const target = await resolveCalendar(toCalendar);
+  if (source === target) throw new Error(`The event is already in "${target}".`);
+  const found = parseEvents(await runAppleScript(findEventScript(uid, source)))[0];
+  if (!found) throw new Error(`No event with uid "${uid}" in "${source}".`);
+  const created = await createEvent({
+    title: found.title,
+    start: found.start,
+    end: found.end,
+    allDay: found.allDay,
+    calendar: target,
+    location: found.location || undefined,
+  });
+  // Only remove the original once the copy exists, so a failure cannot lose the event.
+  await deleteEvent(uid, source);
+  return created;
 }
 
 export async function deleteEvent(uid: string, calendar: string): Promise<void> {

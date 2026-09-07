@@ -16,6 +16,8 @@ macOS Calendar is scriptable. If your account is added to macOS, Oracle talks to
 
 You can check what it sees by asking *"what calendars do I have?"*.
 
+**Which calendar events go to.** If you do not name one, Oracle prefers the calendar named after your account address (`you@gmail.com`) over a bare local calendar such as *Untitled*, because a local calendar never reaches your phone or Notion Calendar. To pin it, just say *"use my Gmail calendar by default"* — that choice is remembered. If something landed in the wrong place, *"move it to my Gmail calendar"* fixes it.
+
 **What you can ask for:**
 
 - *"What's on my calendar this week?"*
