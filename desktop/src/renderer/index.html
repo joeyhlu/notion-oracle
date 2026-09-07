@@ -14,87 +14,152 @@
       <div class="title"><span class="dot"></span>Oracle</div>
       <span id="brain-label" class="model"></span>
       <button class="icon-btn" id="btn-new" title="New conversation">✚</button>
-      <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
+      <button class="icon-btn" id="btn-help" title="Help &amp; FAQ">?</button>
+      <button class="icon-btn" id="btn-settings" title="Setup">⚙</button>
       <button class="icon-btn" id="btn-collapse" title="Collapse">✕</button>
     </header>
 
-    <!-- Chat view -->
+    <!-- ---------- Chat ---------- -->
     <section id="view-chat" class="view">
+      <div id="setup-banner" class="banner" hidden>
+        <span id="setup-banner-text">Finish setup to use Oracle</span>
+        <button class="banner-btn" id="banner-setup">Open setup</button>
+      </div>
       <div id="looking-at" class="looking-at" hidden></div>
       <div id="messages" class="messages"></div>
       <div class="quick" id="quick"></div>
       <div class="composer">
-        <textarea id="input" rows="1" placeholder="Ask about the page you're on, or tell Oracle what to do…"></textarea>
+        <textarea id="input" rows="1" placeholder="Ask about your page, or tell Oracle what to do…"></textarea>
         <button id="send" class="send">Send</button>
       </div>
       <div class="hint">Enter to send · Shift+Enter for a new line · Esc to collapse</div>
     </section>
 
-    <!-- Setup / settings view -->
-    <section id="view-setup" class="view setup" hidden>
-      <h2>1. Your AI account</h2>
-      <p class="muted">Oracle runs on the AI tool you are already signed in to, so it uses your subscription and never an API key.</p>
-      <div class="row">
-        <label class="radio"><input type="radio" name="brain" value="claude"> Claude <span class="muted">(Claude Pro/Max via Claude Code)</span></label>
-        <label class="radio"><input type="radio" name="brain" value="codex"> ChatGPT <span class="muted">(Plus/Pro via Codex CLI)</span></label>
+    <!-- ---------- Setup ---------- -->
+    <section id="view-setup" class="view scroll" hidden>
+      <div class="view-head">
+        <h1>Setup</h1>
+        <p class="muted" id="setup-summary">Checking…</p>
       </div>
-      <div id="brain-status" class="status-card">
-        <div class="status-line"><span id="status-icon">…</span> <span id="status-text">Checking…</span></div>
-        <div class="status-actions">
-          <button id="btn-install" class="chip">Install…</button>
-          <button id="btn-signin" class="chip">Sign in</button>
-          <button id="btn-recheck" class="chip">Re-check</button>
+
+      <!-- Step 1 -->
+      <section class="step" id="step-ai">
+        <button class="step-head" data-step="ai">
+          <span class="step-badge" id="badge-ai">…</span>
+          <span class="step-title">AI account</span>
+          <span class="step-note" id="note-ai">Checking…</span>
+          <span class="chev">›</span>
+        </button>
+        <div class="step-body">
+          <p class="muted">Oracle runs on an AI tool you are already signed in to, so it uses your subscription and never an API key.</p>
+          <div class="row">
+            <label class="radio"><input type="radio" name="brain" value="claude"> Claude <span class="muted">Pro / Max</span></label>
+            <label class="radio"><input type="radio" name="brain" value="codex"> ChatGPT <span class="muted">Plus / Pro</span></label>
+          </div>
+          <div id="brain-status" class="status-card">
+            <div class="status-line"><span id="status-icon">…</span> <span id="status-text">Checking…</span></div>
+            <div class="status-actions">
+              <button id="btn-install" class="chip">Install…</button>
+              <button id="btn-signin" class="chip">Sign in</button>
+              <button id="btn-recheck" class="chip">Re-check</button>
+            </div>
+          </div>
+          <div id="install-help" class="install-help" hidden>
+            <p class="muted">Run one of these in a terminal, then sign in and re-check:</p>
+            <pre id="install-cmd-native"></pre>
+            <pre id="install-cmd-npm"></pre>
+          </div>
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <label>Path to the command <span class="muted">(blank = find it automatically)</span><input type="text" id="cli-path" placeholder="/opt/homebrew/bin/claude"></label>
+            <label>Model override<input type="text" id="model" placeholder="default"></label>
+          </details>
         </div>
-        <details class="advanced">
-          <summary>Advanced</summary>
-          <label>Path to executable (leave blank to auto-detect)<input type="text" id="cli-path" placeholder="/opt/homebrew/bin/claude"></label>
-          <label>Model override<input type="text" id="model" placeholder="default"></label>
-        </details>
-      </div>
-      <div id="install-help" class="install-help" hidden>
-        <p>Install with one of these, then sign in and click Re-check:</p>
-        <pre id="install-cmd-native"></pre>
-        <pre id="install-cmd-npm"></pre>
-        <p class="muted">Sign-in opens your terminal and runs the tool's login command, which uses your existing subscription.</p>
-      </div>
+      </section>
 
-      <h2>2. Connect Notion</h2>
-      <p class="muted">A Notion integration token lets Oracle search, read and write your workspace. Edits show up in the Notion app instantly.</p>
-      <ol class="steps">
-        <li>Open <a href="https://www.notion.so/profile/integrations" data-external>notion.so/profile/integrations</a>, create an <strong>internal</strong> integration with read, update and insert capabilities.</li>
-        <li>Paste its <em>Internal Integration Secret</em> here.</li>
-        <li>In Notion, open the top-level pages Oracle should reach → <strong>•••</strong> → <strong>Connections</strong> → add the integration. Everything nested under a shared page is included.</li>
-      </ol>
-      <label>Integration secret<input type="password" id="notion-token" placeholder="ntn_… or secret_…"></label>
-      <div class="status-actions"><button id="btn-test-notion" class="chip">Test Notion</button> <span id="notion-status" class="muted"></span></div>
+      <!-- Step 2 -->
+      <section class="step" id="step-notion">
+        <button class="step-head" data-step="notion">
+          <span class="step-badge" id="badge-notion">…</span>
+          <span class="step-title">Notion pages</span>
+          <span class="step-note" id="note-notion">Checking…</span>
+          <span class="chev">›</span>
+        </button>
+        <div class="step-body">
+          <p class="muted">Lets Oracle read and write your Notion pages and databases.</p>
+          <ol class="steps">
+            <li>Open <a href="https://www.notion.so/profile/integrations" data-external>notion.so/profile/integrations</a> and create an <strong>internal</strong> integration with read, update and insert capabilities.</li>
+            <li>Paste its <em>Internal Integration Secret</em> below.</li>
+            <li><strong>Share your pages with it</strong> — in Notion, <strong>•••</strong> → <strong>Connections</strong> → add the integration. Sharing a top-level page includes everything under it. <em>This step is the one people miss.</em></li>
+          </ol>
+          <label>Integration secret<input type="password" id="notion-token" placeholder="ntn_… or secret_…"></label>
+          <div class="status-actions"><button id="btn-test-notion" class="chip">Test connection</button> <span id="notion-status" class="muted"></span></div>
+        </div>
+      </section>
 
-      <h2>3. Preferences <span class="badge">optional</span></h2>
-      <label>Always tell Oracle…<textarea id="custom-instructions" rows="2" placeholder="e.g. My tasks live in the Tasks database. Reply in French."></textarea></label>
-      <label>Shortcut<input type="text" id="hotkey" placeholder="CommandOrControl+Shift+Space"></label>
-      <label class="checkbox"><input type="checkbox" id="follow-notion"> Only show the overlay while Notion is in front</label>
-      <p class="muted" id="follow-note">Keeps the ◎ button off your screen in every other app. The keyboard shortcut still opens Oracle from anywhere.</p>
+      <!-- Step 3 -->
+      <section class="step" id="step-calendar">
+        <button class="step-head" data-step="calendar">
+          <span class="step-badge" id="badge-calendar">…</span>
+          <span class="step-title">Calendar</span>
+          <span class="step-note" id="note-calendar">Optional</span>
+          <span class="chev">›</span>
+        </button>
+        <div class="step-body">
+          <p class="muted">Add your Google, iCloud or Outlook account in <strong>System Settings → Internet Accounts</strong> and Oracle can read and change your real calendar. macOS will ask you to approve it the first time.</p>
+          <label class="checkbox"><input type="checkbox" id="calendar-automation"> Let Oracle work with my calendar</label>
+          <label>How to reach it
+            <select id="calendar-backend">
+              <option value="system">macOS Calendar — read, create, edit, delete (recommended)</option>
+              <option value="notion-app">Type into Notion Calendar — create only</option>
+            </select>
+          </label>
+          <details class="advanced">
+            <summary>Notion Calendar fallback options</summary>
+            <label class="checkbox"><input type="checkbox" id="calendar-autosave"> Save events automatically instead of letting me confirm</label>
+            <label>How to create events
+              <select id="calendar-strategy">
+                <option value="new-event-key">Jump to the day and type the title</option>
+                <option value="command-bar">Type a natural-language line into the command bar</option>
+              </select>
+            </label>
+          </details>
+        </div>
+      </section>
 
-      <h2>4. Notion Calendar <span class="badge">experimental</span></h2>
-      <p class="muted">Add your Google, iCloud or Outlook account in <strong>System Settings → Internet Accounts</strong> and Oracle can read and change your real calendar directly through the macOS Calendar app — the same events you see in Notion Calendar. macOS will ask you to approve Notion Oracle the first time. Without that account, Oracle falls back to typing into the Notion Calendar app, which can only create events and cannot read anything back.</p>
-      <label class="checkbox"><input type="checkbox" id="calendar-automation"> Let Oracle work with your calendar</label>
-      <label>How to reach your calendar
-        <select id="calendar-backend">
-          <option value="system">macOS Calendar app (recommended: read, create, edit and delete)</option>
-          <option value="notion-app">Type into the Notion Calendar app (create only, no reading)</option>
-        </select>
-      </label>
-      <label class="checkbox"><input type="checkbox" id="calendar-autosave"> Save events automatically (otherwise the new event is left open for you to press Enter)</label>
-      <label>How to create events
-        <select id="calendar-strategy">
-          <option value="new-event-key">Jump to the day, press C, type the title (reliable date; adjust the time yourself)</option>
-          <option value="command-bar">Type a natural-language line into Cmd+K (can set the time; depends on the app parsing it)</option>
-        </select>
-      </label>
+      <!-- Step 4 -->
+      <section class="step" id="step-prefs">
+        <button class="step-head" data-step="prefs">
+          <span class="step-badge ok">✓</span>
+          <span class="step-title">Preferences</span>
+          <span class="step-note">Shortcut and behaviour</span>
+          <span class="chev">›</span>
+        </button>
+        <div class="step-body">
+          <label>Always tell Oracle…<textarea id="custom-instructions" rows="2" placeholder="e.g. My tasks live in the Tasks database. Keep summaries under 5 bullets."></textarea></label>
+          <label>Keyboard shortcut<input type="text" id="hotkey" placeholder="CommandOrControl+Shift+Space"></label>
+          <label class="checkbox"><input type="checkbox" id="follow-notion"> Only show the ◎ button while Notion is in front</label>
+          <p class="muted" id="follow-note">The keyboard shortcut still opens Oracle from anywhere.</p>
+        </div>
+      </section>
 
       <div class="setup-footer">
-        <button id="btn-save" class="send">Save &amp; start</button>
+        <button id="btn-save" class="send">Save</button>
         <span id="save-status" class="muted"></span>
         <button id="btn-quit" class="chip quit">Quit Oracle</button>
+      </div>
+    </section>
+
+    <!-- ---------- Help ---------- -->
+    <section id="view-help" class="view scroll" hidden>
+      <div class="view-head">
+        <h1>Help</h1>
+        <p class="muted">The things that most often go wrong, and what fixes them.</p>
+      </div>
+      <div id="faq"></div>
+      <div class="setup-footer">
+        <button id="btn-help-setup" class="chip">Open setup</button>
+        <a href="https://github.com/joeyhlu/notion-oracle" data-external class="muted">Project page</a>
       </div>
     </section>
   </div>
