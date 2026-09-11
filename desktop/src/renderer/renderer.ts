@@ -66,7 +66,7 @@ function el(tag: string, className: string, text?: string): HTMLElement {
 function renderEmpty(): void {
   messages().replaceChildren();
   const empty = el("div", "empty");
-  empty.innerHTML = "<strong>Hi, I'm Oracle.</strong><br>Ask about the page you have open in Notion, draft content, or add events to a calendar. Everything I change shows up in Notion right away.";
+  empty.innerHTML = "<strong>Hi, I'm Oracle.</strong>Ask about the page you have open in Notion, draft content, or add events to a calendar. Everything I change shows up in Notion right away.";
   messages().appendChild(empty);
 }
 

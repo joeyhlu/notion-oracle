@@ -1,11 +1,65 @@
+/*
+ * Design notes
+ *
+ * Sharp rather than soft. The things that make an interface look generated — a violet accent,
+ * 14px radii on everything, stacked drop shadows, lozenge buttons, generous padding standing in
+ * for hierarchy — are deliberately absent. Instead:
+ *
+ *   - one ink-and-paper palette; the only saturated colour is reserved for status and focus
+ *   - a radius scale with three steps, none of them large, and none of them pill-shaped
+ *   - hairline rules do the separating; exactly one element in the app casts a shadow
+ *   - density: 13px base, tight tracking, small caps micro-labels
+ *   - the primary button is near-black, not a colour
+ */
+
 :root {
-  --bg: #ffffff; --bg-2: #f7f6f3; --fg: #37352f; --fg-2: #787774; --border: #e9e9e7;
-  --accent: #6b57ff; --accent-fg: #ffffff; --user: #eef0ff; --danger: #d44c47; --ok: #2e8b57; --radius: 14px;
+  --paper: #ffffff;
+  --paper-2: #f7f7f6;        /* recessed fill: inputs, code, hover */
+  --ink: #141413;
+  --ink-2: #6f6f6c;          /* secondary text */
+  --ink-3: #9a9a96;          /* tertiary: hints, placeholders */
+  --line: #e3e3e0;           /* hairline */
+  --line-2: #cfcfca;         /* emphasised hairline: focus, hover borders */
+  --solid: #141413;          /* primary button */
+  --solid-fg: #ffffff;
+  --accent: #2b5fd9;         /* links and focus only */
+  --accent-soft: #eaeffc;
+  --good: #1f7a4d;
+  --good-soft: #e6f2ec;
+  --bad: #b4281f;
+  --bad-soft: #fbeae9;
+  --user-bubble: #f0f0ee;
+
+  --r-panel: 10px;
+  --r: 6px;
+  --r-sm: 4px;
+
+  --t: 110ms cubic-bezier(.2, 0, .2, 1);
+
   color-scheme: light dark;
 }
+
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #202020; --bg-2: #2a2a2a; --fg: #e6e6e4; --fg-2: #9b9b98; --border: #3a3a3a; --user: #2d2b45; }
+  :root {
+    --paper: #16161a;
+    --paper-2: #202024;
+    --ink: #ececeb;
+    --ink-2: #a1a1a0;
+    --ink-3: #78787a;
+    --line: #2c2c31;
+    --line-2: #41414a;
+    --solid: #f2f2f0;
+    --solid-fg: #16161a;
+    --accent: #7ba4ff;
+    --accent-soft: #1d2740;
+    --good: #5fcf95;
+    --good-soft: #16301f;
+    --bad: #f08279;
+    --bad-soft: #33191a;
+    --user-bubble: #26262c;
+  }
 }
+
 * { box-sizing: border-box; }
 /*
  * Every view and banner is shown or hidden through the `hidden` attribute, and several of them
@@ -15,12 +69,17 @@
  * specificity in each rule: hidden must mean hidden, whatever else a rule says.
  */
 [hidden] { display: none !important; }
-html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-body { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; color: var(--fg); }
-button { font: inherit; color: inherit; cursor: pointer; }
-a { color: var(--accent); }
 
-/* Collapsed: only the pill is visible. Expanded: only the panel. */
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  font-size: 13px; line-height: 1.5; letter-spacing: -.006em; color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
+a { color: var(--accent); text-underline-offset: 2px; }
+
+/* ---------- Collapsed pill ---------- */
 /*
  * NOTHING in the collapsed overlay may be a drag region. -webkit-app-region is inherited, and
  * an element the OS treats as a title bar has its clicks swallowed by the window manager before
@@ -29,164 +88,287 @@ a { color: var(--accent); }
  * simply not draggable. Move the window by its panel header instead.
  */
 .pill {
-  position: absolute; inset: 8px; border-radius: 50%; border: 1px solid var(--border); background: var(--accent); color: var(--accent-fg);
-  font-size: 22px; box-shadow: 0 6px 20px rgba(0,0,0,.25); -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 8px; border-radius: 12px; border: none;
+  background: var(--solid); color: var(--solid-fg); font-size: 19px; line-height: 1;
+  box-shadow: 0 1px 2px rgba(0,0,0,.16), 0 6px 16px rgba(0,0,0,.18);
+  -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
+  transition: transform var(--t);
 }
-.pill:hover { transform: scale(1.05); }
+.pill:hover { transform: scale(1.04); }
+.pill:active { transform: scale(.97); }
 body.expanded .pill { display: none; }
 body.collapsed .panel { display: none; }
 
+/* ---------- Panel ---------- */
 .panel {
-  position: absolute; inset: 0; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: 0 12px 40px rgba(0,0,0,.28); display: flex; flex-direction: column; overflow: hidden;
+  position: absolute; inset: 0; background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--r-panel); box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 30px rgba(0,0,0,.14);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); -webkit-app-region: drag; }
+.header {
+  display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line); -webkit-app-region: drag;
+}
 .header button { -webkit-app-region: no-drag; }
-.title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
-.model { color: var(--fg-2); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.icon-btn { background: transparent; border: none; border-radius: 6px; width: 28px; height: 28px; color: var(--fg-2); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
-.icon-btn:hover { background: var(--bg-2); color: var(--fg); }
+.title { font-weight: 600; font-size: 13px; letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; }
+/* A square mark reads sharper than a dot and echoes the radius scale. */
+.dot { width: 7px; height: 7px; border-radius: 2px; background: var(--solid); display: inline-block; }
+.model {
+  color: var(--ink-3); font-size: 11px; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.icon-btn {
+  background: none; border: none; border-radius: var(--r-sm); width: 26px; height: 26px;
+  color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: background var(--t), color var(--t);
+}
+.icon-btn:hover { background: var(--paper-2); color: var(--ink); }
+.icon-btn:active { background: var(--line); }
 
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.looking-at { font-size: 12px; color: var(--fg-2); padding: 6px 12px 0; }
-.looking-at strong { color: var(--fg); font-weight: 500; }
 
-.messages { flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; }
-.empty { color: var(--fg-2); text-align: center; margin-top: 28px; line-height: 1.6; padding: 0 20px; }
-.empty strong { color: var(--fg); }
-.msg { line-height: 1.5; word-wrap: break-word; }
-.msg.user { align-self: flex-end; background: var(--user); padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; max-width: 90%; }
-.msg.assistant .body p { margin: 0 0 8px; }
+/* ---------- Chat ---------- */
+.looking-at { font-size: 11px; color: var(--ink-3); padding: 8px 14px 0; }
+.looking-at strong { color: var(--ink-2); font-weight: 500; }
+
+.messages {
+  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+/* Left-aligned and top-anchored: a centred greeting floating in the middle of the panel is the
+ * stock empty state, and it leaves the suggestions at the bottom looking unrelated to it. */
+.empty { color: var(--ink-2); max-width: 38ch; margin: 2px 0 0; line-height: 1.6; }
+.empty strong { display: block; color: var(--ink); font-size: 14px; letter-spacing: -.015em; margin-bottom: 3px; }
+.msg { line-height: 1.55; word-wrap: break-word; }
+.msg.user {
+  align-self: flex-end; max-width: 88%; background: var(--user-bubble);
+  padding: 7px 11px; border-radius: var(--r); white-space: pre-wrap;
+}
+.msg.assistant .body p { margin: 0 0 9px; }
 .msg.assistant .body p:last-child { margin-bottom: 0; }
-.msg.assistant .body h3, .msg.assistant .body h4, .msg.assistant .body h5 { margin: 10px 0 6px; font-size: 14px; }
-.msg.assistant .body h3 { font-size: 16px; }
-.msg.assistant .body ul, .msg.assistant .body ol { margin: 4px 0 8px; padding-left: 22px; }
-.msg.assistant .body code { background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.msg.assistant .body pre { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow-x: auto; }
+.msg.assistant .body h3, .msg.assistant .body h4, .msg.assistant .body h5 {
+  margin: 14px 0 5px; font-size: 13px; letter-spacing: -.01em;
+}
+.msg.assistant .body h3 { font-size: 14px; }
+.msg.assistant .body ul, .msg.assistant .body ol { margin: 5px 0 9px; padding-left: 20px; }
+.msg.assistant .body li { margin: 2px 0; }
+.msg.assistant .body code {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: .5px 4px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.msg.assistant .body pre {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 10px 11px; overflow-x: auto; font-size: 12px;
+}
 .msg.assistant .body pre code { background: none; border: none; padding: 0; }
-.msg.assistant .body blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--border); color: var(--fg-2); }
-.msg.assistant .body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.msg.assistant .body blockquote {
+  margin: 8px 0; padding-left: 11px; border-left: 2px solid var(--line-2); color: var(--ink-2);
+}
+.msg.assistant .body hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 
-.tools { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
-.tool { font-size: 12px; color: var(--fg-2); background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; display: flex; gap: 6px; align-items: baseline; }
-.tool .name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
+/* Tool calls: a compact log, indented under the reply rather than competing with it. */
+.tools { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; }
+.tool {
+  font-size: 11.5px; color: var(--ink-2); background: var(--paper-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px 8px;
+  display: flex; gap: 7px; align-items: baseline;
+}
+.tool .name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--ink);
+}
 .tool.running .status::after { content: "…"; }
-.tool.error { border-color: var(--danger); }
+.tool.error { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
 .tool .summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.thinking { color: var(--fg-2); font-size: 13px; }
+.thinking { color: var(--ink-3); font-size: 12px; }
 .thinking::after { content: ""; animation: dots 1.2s steps(4, end) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
-.error { color: var(--danger); font-size: 13px; white-space: pre-wrap; }
-.actions { display: flex; gap: 6px; margin-top: 6px; }
+.error { color: var(--bad); font-size: 12px; white-space: pre-wrap; }
+.actions { display: flex; gap: 6px; margin-top: 7px; }
 
-.chip { border: 1px solid var(--border); background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--fg-2); transition: background .12s ease, color .12s ease, border-color .12s ease; }
-.chip:hover { background: var(--bg-2); color: var(--fg); }
-.quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 2px; }
-.composer { display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--border); align-items: flex-end; }
-.composer textarea { flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-2); color: var(--fg); font: inherit; line-height: 1.4; outline: none; }
-.composer textarea:focus { border-color: var(--accent); }
-.send { background: var(--accent); color: var(--accent-fg); border: none; border-radius: 8px; height: 40px; padding: 0 14px; font-weight: 600; transition: filter .12s ease; }
-.send:hover { filter: brightness(1.08); }
-.send.stop { background: var(--danger); }
-.hint { font-size: 11px; color: var(--fg-2); padding: 0 12px 8px; }
-
-/* Setup */
-.muted { color: var(--fg-2); font-size: 13px; }
-.view.scroll p { margin: 4px 0 8px; }
-.row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.radio { display: flex; align-items: center; gap: 6px; }
-.status-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 11px; margin-top: 10px; }
-.status-line { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
-.status-line.ok { color: var(--ok); }
-.status-line.bad { color: var(--danger); }
-.status-actions { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
-.advanced { margin-top: 8px; font-size: 12px; }
-.advanced summary { cursor: pointer; color: var(--fg-2); }
-.install-help { margin-top: 8px; font-size: 13px; }
-.install-help pre { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 12px; overflow-x: auto; user-select: all; }
-.steps { padding-left: 20px; font-size: 13px; }
-.steps li { margin: 4px 0; }
-.view.scroll label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 13px; }
-.view.scroll input[type="text"], .view.scroll input[type="password"], .view.scroll textarea { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font: inherit; font-weight: normal; background: var(--bg-2); color: var(--fg); }
-.badge { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; color: var(--fg-2); font-weight: normal; }
-/*
- * `margin-top: auto` drops it to the bottom of the column: with the steps collapsed the content
- * is short, and a Save button floating in the middle of an empty panel reads as an unfinished
- * layout. The negative side margins let its background span the view's 16px padding.
- */
-.setup-footer {
-  display: flex; align-items: center; gap: 10px; margin: auto -16px 0;
-  padding: 12px 16px; background: var(--bg); border-top: 1px solid var(--border);
+/* ---------- Controls ---------- */
+.chip {
+  border: 1px solid var(--line); background: var(--paper); border-radius: var(--r-sm);
+  padding: 3px 9px; font-size: 12px; color: var(--ink-2);
+  transition: background var(--t), color var(--t), border-color var(--t);
 }
-.quit { margin-left: auto; }
+.chip:hover { background: var(--paper-2); border-color: var(--line-2); color: var(--ink); }
+/* The suggestions read as a deliberate row rather than loose buttons with a label that costs
+ * one line. QUICK_ACTIONS is populated once and never cleared, so the label cannot outlive it. */
+.quick { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
+.quick::before {
+  flex-basis: 100%; content: "Try"; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); margin-bottom: 1px;
+}
+.composer {
+  display: flex; gap: 7px; padding: 10px 14px 12px; border-top: 1px solid var(--line);
+  align-items: flex-end;
+}
+.composer textarea {
+  flex: 1; resize: none; min-height: 34px; max-height: 160px; padding: 7px 9px;
+  border-radius: var(--r); border: 1px solid var(--line); background: var(--paper);
+  color: var(--ink); font: inherit; letter-spacing: inherit; line-height: 1.45; outline: none;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.composer textarea::placeholder { color: var(--ink-3); }
+.composer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.send {
+  background: var(--solid); color: var(--solid-fg); border: none; border-radius: var(--r);
+  height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 550;
+  transition: opacity var(--t);
+}
+.send:hover { opacity: .86; }
+.send:active { opacity: .74; }
+.send.stop { background: var(--bad); }
+.hint { font-size: 11px; color: var(--ink-3); padding: 0 14px 9px; }
 
-.view.scroll label.checkbox { display: flex; align-items: center; gap: 8px; font-weight: normal; }
-.view.scroll label.checkbox input { width: auto; margin: 0; }
-#follow-note { margin-top: 2px; }
-.view.scroll select { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font: inherit; font-weight: normal; background: var(--bg-2); color: var(--fg); }
+/* ---------- Banner ---------- */
+.banner {
+  display: flex; align-items: center; gap: 10px; margin: 10px 14px 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-left: 2px solid var(--bad); border-radius: var(--r-sm);
+  background: var(--paper-2); font-size: 12px;
+}
+.banner span { flex: 1; }
+.banner-btn {
+  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r-sm);
+  padding: 3px 8px; font-size: 11.5px; white-space: nowrap; transition: background var(--t);
+}
+.banner-btn:hover { background: var(--paper-2); }
 
-/* ---------- Views that scroll (setup, help) ---------- */
+/* ---------- Scrolling views (setup, help) ---------- */
 /*
  * A column rather than a block so the footer can be pushed to the bottom on a short page (all
  * steps collapsed) while still scrolling away naturally on a long one. Children opt out of
  * shrinking: without that, an overflowing column squashes the steps instead of scrolling.
  */
-.view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 16px; }
+.view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px; }
 .view.scroll > * { flex: none; }
-.view-head { padding: 14px 0 6px; }
-.view-head h1 { font-size: 18px; margin: 0 0 2px; }
-.view.scroll .view-head p { margin: 0; }
+.view-head { padding: 16px 0 10px; }
+/* A tracked-out micro-label instead of a large heading: the panel is 400px wide, and a 24px
+ * title would spend a tenth of the window announcing which screen you are already looking at. */
+.view-head h1 {
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-3); margin: 0 0 5px;
+}
+.view.scroll .view-head p { margin: 0; color: var(--ink); font-size: 13px; }
+.view.scroll p { margin: 5px 0 9px; }
+.muted { color: var(--ink-2); font-size: 12px; }
+
+.view.scroll label {
+  display: block; font-weight: 550; margin: 11px 0 3px; font-size: 12px; color: var(--ink);
+}
+.view.scroll input[type="text"], .view.scroll input[type="password"], .view.scroll textarea {
+  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r);
+  border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
+  background: var(--paper); color: var(--ink); outline: none;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.view.scroll input[type="text"]:focus, .view.scroll input[type="password"]:focus,
+.view.scroll textarea:focus, .view.scroll select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.view.scroll select {
+  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r);
+  border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
+  background: var(--paper); color: var(--ink); outline: none;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.view.scroll label.checkbox {
+  display: flex; align-items: flex-start; gap: 8px; font-weight: 400; color: var(--ink-2);
+}
+.view.scroll label.checkbox input { width: auto; margin: 1px 0 0; accent-color: var(--solid); }
+#follow-note { margin-top: 3px; }
 
 /* ---------- Setup steps ---------- */
-.step { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden; background: var(--bg); }
+/*
+ * One bordered list with dividers, not four floating cards. Four separate rounded boxes with gaps
+ * between them is the shape that makes a settings screen read as generated; a single ruled list
+ * is denser and puts the statuses in one column you can scan.
+ */
+.step { border: 1px solid var(--line); border-top: none; background: var(--paper); }
+.step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; }
+.step:last-of-type { border-radius: 0 0 var(--r) var(--r); }
 .step-head {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px;
-  background: transparent; border: none; text-align: left; font: inherit;
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 11px;
+  background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
+  transition: background var(--t);
 }
-.step-head:hover { background: var(--bg-2); }
-.step-title { font-weight: 600; font-size: 13.5px; }
-.step-note { color: var(--fg-2); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chev { color: var(--fg-2); transition: transform .15s ease; }
+.step-head:hover { background: var(--paper-2); }
+.step-title { font-weight: 550; font-size: 12.5px; }
+.step-note {
+  color: var(--ink-3); font-size: 11.5px; flex: 1; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chev { color: var(--ink-3); font-size: 13px; transition: transform var(--t); }
 .step.open .chev { transform: rotate(90deg); }
-.step-body { display: none; padding: 0 12px 14px; }
+.step.open .step-head { background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.step-body { display: none; padding: 2px 11px 13px; }
 .step.open .step-body { display: block; }
-.step-body > p:first-child { margin-top: 0; }
+.step-body > p:first-child { margin-top: 9px; }
 
-/* Status badge: a glance tells you whether a step is done. */
+/* Status: a small tinted square, not a solid circle. Scans as a column of states. */
 .step-badge {
-  width: 20px; height: 20px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; background: var(--bg-2); color: var(--fg-2); border: 1px solid var(--border);
+  width: 17px; height: 17px; border-radius: var(--r-sm); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 700; line-height: 1;
+  background: var(--paper-2); color: var(--ink-3); border: 1px solid var(--line);
 }
-.step-badge.ok { background: var(--ok); color: #fff; border-color: transparent; }
-.step-badge.warn { background: var(--danger); color: #fff; border-color: transparent; }
-.step-badge.optional { background: transparent; }
+.step-badge.ok { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.step-badge.warn { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.step-badge.optional { background: none; }
 
-/* ---------- Banner on the chat view ---------- */
-.banner {
-  display: flex; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 9px 11px;
-  border: 1px solid var(--border); border-left: 3px solid var(--danger); border-radius: 8px;
-  background: var(--bg-2); font-size: 12.5px;
+.row { display: flex; flex-direction: column; gap: 7px; margin: 11px 0; }
+.radio { display: flex; align-items: center; gap: 7px; }
+.radio input { accent-color: var(--solid); margin: 0; }
+.status-card { border: 1px solid var(--line); border-radius: var(--r); padding: 9px 10px; margin-top: 11px; }
+.status-line { display: flex; gap: 7px; align-items: baseline; font-size: 12px; color: var(--ink-2); }
+.status-line.ok { color: var(--good); }
+.status-line.bad { color: var(--bad); }
+.status-actions { display: flex; gap: 5px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.advanced { margin-top: 11px; font-size: 12px; }
+.advanced summary { cursor: pointer; color: var(--ink-3); font-size: 11.5px; }
+.advanced summary:hover { color: var(--ink-2); }
+.install-help { margin-top: 9px; }
+.install-help pre {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 7px 9px; margin: 5px 0 0; font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-x: auto; user-select: all;
 }
-.banner span { flex: 1; }
-.banner-btn { border: 1px solid var(--border); background: var(--bg); border-radius: 6px; padding: 3px 9px; font-size: 12px; }
-.banner-btn:hover { background: var(--bg-2); }
+.steps { padding-left: 17px; font-size: 12px; color: var(--ink-2); margin: 8px 0; }
+.steps li { margin: 5px 0; }
+.steps strong { color: var(--ink); font-weight: 550; }
 
-/* ---------- FAQ ---------- */
-.faq-item { border-bottom: 1px solid var(--border); }
+.setup-footer {
+  display: flex; align-items: center; gap: 9px; margin: auto -14px 0;
+  padding: 10px 14px; background: var(--paper); border-top: 1px solid var(--line);
+}
+.quit { margin-left: auto; }
+.quit:hover { border-color: var(--bad); color: var(--bad); }
+
+/* ---------- Help ---------- */
+.faq-item { border-bottom: 1px solid var(--line); }
 .faq-q {
-  display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 2px;
-  background: transparent; border: none; text-align: left; font: inherit; font-weight: 600; font-size: 13.5px;
+  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 10px 1px;
+  background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
+  font-weight: 550; font-size: 12.5px; transition: color var(--t);
 }
 .faq-q:hover { color: var(--accent); }
 .faq-q .chev { margin-left: auto; }
 .faq-item.open .chev { transform: rotate(90deg); }
-.faq-a { display: none; padding: 0 2px 12px; font-size: 13px; line-height: 1.55; color: var(--fg-2); }
+.faq-item.open .faq-q { color: var(--ink); }
+.faq-a { display: none; padding: 0 1px 12px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
 .faq-item.open .faq-a { display: block; }
 .faq-a p { margin: 0 0 8px; }
 .faq-a p:last-child { margin-bottom: 0; }
-.faq-a strong { color: var(--fg); }
+.faq-a strong { color: var(--ink); font-weight: 550; }
 .faq-a code {
-  background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
-  font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: .5px 4px; font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
 }
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--line); border: 3px solid transparent; background-clip: content-box; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--line-2); background-clip: content-box; }
+::-webkit-scrollbar-track { background: none; }

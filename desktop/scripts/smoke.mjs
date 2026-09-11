@@ -6,6 +6,9 @@
  * outranked the `hidden` attribute — every test passed, and the panel was unusable. This is the
  * check that would have caught it, so it runs in CI.
  *
+ * It renders both themes: a dark palette is easy to half-define, and a token that exists only
+ * in the light block shows up as unreadable text or a transparent panel, never as a test failure.
+ *
  * Usage: node scripts/smoke.mjs [--out <dir>]   (writes screenshots when --out is given)
  */
 import { chromium } from "playwright";
@@ -45,6 +48,20 @@ function installBridge(ready) {
   };
 }
 
+/** Relative luminance per WCAG, from a computed `rgb(r, g, b)` string. */
+function luminance(rgb) {
+  const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).slice(0, 3).map((n) => {
+    const c = Number(n) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 const failures = [];
 const check = (label, actual, expected) => {
   const a = JSON.stringify(actual);
@@ -57,9 +74,12 @@ const check = (label, actual, expected) => {
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 
+for (const scheme of ["light", "dark"]) {
 for (const ready of [true, false]) {
-  const state = ready ? "configured" : "fresh";
-  const page = await browser.newPage({ viewport: { width: 420, height: 620 }, deviceScaleFactor: 2 });
+  const state = `${scheme}-${ready ? "configured" : "fresh"}`;
+  const page = await browser.newPage({
+    viewport: { width: 420, height: 620 }, deviceScaleFactor: 2, colorScheme: scheme,
+  });
   const noise = [];
   page.on("pageerror", (e) => noise.push(String(e)));
   page.on("console", (m) => m.type() === "error" && noise.push(m.text()));
@@ -106,8 +126,24 @@ for (const ready of [true, false]) {
   check(`${state}: no sideways overflow`, await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true);
 
+  // A token defined only in the light block leaves an element transparent or its text unreadable.
+  const paint = await page.evaluate(() => {
+    const read = (sel) => {
+      const c = getComputedStyle(document.querySelector(sel));
+      return { bg: c.backgroundColor, fg: c.color };
+    };
+    // Not body: the Electron window is transparent by design and the panel does the painting.
+    return { panel: read(".panel"), pill: read(".pill"), send: read(".send"), chip: read(".chip") };
+  });
+  for (const [name, { bg, fg }] of Object.entries(paint)) {
+    check(`${state}: ${name} has a background`, /rgba?\([^)]*?(,\s*0)\)$/.test(bg), false);
+    const ratio = contrast(bg, fg);
+    check(`${state}: ${name} text is readable (${ratio.toFixed(1)}:1)`, ratio >= 4.5, true);
+  }
+
   check(`${state}: console clean`, noise, []);
   await page.close();
+}
 }
 
 await browser.close();

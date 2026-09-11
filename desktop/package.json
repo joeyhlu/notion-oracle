@@ -1,6 +1,6 @@
 {
   "name": "notion-oracle-desktop",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Notion Oracle: an AI overlay for the Notion desktop app, powered by your own Claude Code or Codex sign-in.",
   "main": "dist/main/main.js",
