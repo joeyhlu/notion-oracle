@@ -153,7 +153,7 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
   {
     name: "update_block",
     description:
-      "Replace the content of one existing block, editing the page in place. Use this to rewrite a paragraph, fix wording, translate a line, or convert a block to a different type (write Markdown: '# ' for a heading, '- ' for a bullet, '- [ ] ' for a to-do). If the Markdown expands to several blocks the first replaces the target and the rest are inserted after it. Get block ids from read_page_blocks.",
+      "Replace the content of one existing block, editing the page in place. Use this to rewrite a paragraph, fix wording, translate a line, or convert a block to a different type (write Markdown: '# ' for a heading, '- ' for a bullet, '- [ ] ' for a to-do). If the Markdown expands to several blocks the first replaces the target and the rest are inserted after it. Changing a block's type replaces it in place and returns new block ids, since Notion cannot retype a block. Get block ids from read_page_blocks.",
     input_schema: {
       type: "object",
       properties: {
@@ -360,21 +360,25 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
         case "update_block": {
           const notion = requireNotion();
           const blocks = markdownToBlocks(String(input.markdown ?? ""));
-          const first = blocks[0];
-          if (!first) return fail("The markdown was empty, so there is nothing to replace the block with. Use delete_block to remove a block.");
-          await notion.updateBlock(String(input.block_id), first);
-          // Markdown that expands past one block keeps its remainder, inserted in order.
-          const rest = blocks.slice(1);
-          const inserted = rest.length ? await notion.insertBlocksAfter(String(input.block_id), rest) : 0;
-          return ok({ updated: true, block_id: input.block_id, type: first.type, inserted_after: inserted });
+          if (!blocks.length) return fail("The markdown was empty, so there is nothing to replace the block with. Use delete_block to remove a block.");
+          const result = await notion.replaceBlock(String(input.block_id), blocks);
+          return ok({
+            updated: true,
+            type: result.to,
+            // A conversion archives the original, so the old id is dead. Handing back the new ids
+            // keeps a follow-up edit from targeting a block that no longer exists.
+            ...(result.converted
+              ? { converted_from: result.from, block_ids: result.blockIds, note: "Type changed, so this is a new block; the original is in Notion's trash." }
+              : { block_id: result.blockIds[0], inserted_after: result.blockIds.length - 1 }),
+          });
         }
 
         case "insert_after_block": {
           const notion = requireNotion();
           const blocks = markdownToBlocks(String(input.markdown ?? ""));
           if (!blocks.length) return fail("The markdown was empty, so there is nothing to insert.");
-          const count = await notion.insertBlocksAfter(String(input.block_id), blocks);
-          return ok({ inserted: count, after_block_id: input.block_id });
+          const created = await notion.insertBlocksAfter(String(input.block_id), blocks);
+          return ok({ inserted: created.length, after_block_id: input.block_id, block_ids: created.map((b) => b.id) });
         }
 
         case "delete_block": {

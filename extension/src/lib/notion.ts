@@ -67,6 +67,15 @@ export interface NotionDataSource {
 }
 
 /** A database plus the data source that schema and row operations should target. */
+export interface ReplaceResult {
+  /** True when the block's type changed, which means the original id no longer exists. */
+  converted: boolean;
+  from: string;
+  to: string;
+  /** Ids of the blocks now holding the content, in order. */
+  blockIds: string[];
+}
+
 export interface ResolvedDataSource {
   databaseId: string;
   dataSourceId: string;
@@ -268,17 +277,55 @@ export class NotionClient {
     return this.request("DELETE", `/blocks/${normalizeId(blockId)}`);
   }
 
-  /** Insert blocks directly after an existing sibling, rather than at the end of the page. */
-  async insertBlocksAfter(blockId: string, blocks: NotionBlock[]): Promise<number> {
-    if (!blocks.length) return 0;
-    const target = normalizeId(blockId);
-    const block = await this.getBlock(target);
+  private static parentIdOf(block: { parent?: Record<string, unknown> }): string {
     const parent = (block.parent ?? {}) as { type?: string; page_id?: string; block_id?: string };
     const parentId = parent.page_id ?? parent.block_id;
     if (!parentId) throw new Error("Could not determine which page or block contains that block.");
+    return parentId;
+  }
+
+  /**
+   * Insert blocks directly after an existing sibling, rather than at the end of the page.
+   *
+   * `known` lets a caller that has already fetched the target skip a second round trip.
+   */
+  async insertBlocksAfter(blockId: string, blocks: NotionBlock[], known?: FetchedBlock & { parent?: Record<string, unknown> }): Promise<FetchedBlock[]> {
+    if (!blocks.length) return [];
+    const target = normalizeId(blockId);
+    const parentId = NotionClient.parentIdOf(known ?? await this.getBlock(target));
     // `after` positions the insert; without it Notion appends to the end of the parent.
-    await this.request("PATCH", `/blocks/${normalizeId(parentId)}/children`, { children: blocks, after: target });
-    return blocks.length;
+    const response = await this.request<{ results?: FetchedBlock[] }>(
+      "PATCH", `/blocks/${normalizeId(parentId)}/children`, { children: blocks, after: target });
+    return response.results ?? [];
+  }
+
+  /**
+   * Replace a block's content, changing its type when the new Markdown asks for one.
+   *
+   * Notion's PATCH /blocks/{id} can only rewrite a block as the type it already is: sending a
+   * `to_do` body to a paragraph fails with "Block type mismatch: this block is a `paragraph`".
+   * Converting between types is the common case — "turn this into a checklist", "make that a
+   * heading" — so a mismatch is emulated rather than reported: the replacement goes in directly
+   * after the target and the target is archived, which keeps the position and leaves the original
+   * recoverable from Notion's trash.
+   *
+   * Same-type edits still go through PATCH, which preserves the block's id and any children.
+   */
+  async replaceBlock(blockId: string, blocks: NotionBlock[]): Promise<ReplaceResult> {
+    const first = blocks[0];
+    if (!first) throw new Error("No replacement content was given.");
+    const target = normalizeId(blockId);
+    const existing = await this.getBlock(target);
+
+    if (existing.type === first.type) {
+      await this.updateBlock(target, first);
+      const extra = await this.insertBlocksAfter(target, blocks.slice(1), existing);
+      return { converted: false, from: existing.type, to: first.type, blockIds: [target, ...extra.map((b) => b.id)] };
+    }
+
+    const created = await this.insertBlocksAfter(target, blocks, existing);
+    await this.deleteBlock(target);
+    return { converted: true, from: existing.type, to: first.type, blockIds: created.map((b) => b.id) };
   }
 
   updatePage(pageId: string, properties: Record<string, unknown>): Promise<NotionPage> {

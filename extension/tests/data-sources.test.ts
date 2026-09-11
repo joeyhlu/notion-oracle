@@ -186,8 +186,9 @@ test("read_page_blocks exposes block ids so edits have something to target", asy
   }
 });
 
-test("update_block rewrites a block in place and can change its type", async () => {
+test("update_block rewrites a block of the same type through PATCH", async () => {
   const { calls, restore } = stubFetch({
+    [`GET /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "heading_2", parent: { type: "page_id", page_id: PAGE_ID } } }),
     [`PATCH /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "heading_2" } }),
   });
   try {
@@ -198,6 +199,8 @@ test("update_block rewrites a block in place and can change its type", async () 
     assert.equal(patch?.body?.type, "heading_2");
     const heading = (patch?.body as Record<string, { rich_text: Array<{ text: { content: string } }> }> | null)?.heading_2;
     assert.equal(heading?.rich_text[0]?.text.content, "Terms and definitions");
+    // Same type keeps the block, so nothing is archived.
+    assert.equal(calls.filter((c) => c.method === "DELETE").length, 0);
   } finally {
     restore();
   }
@@ -207,7 +210,7 @@ test("update_block keeps the remainder when markdown expands past one block", as
   const { calls, restore } = stubFetch({
     [`PATCH /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "paragraph" } }),
     [`GET /blocks/${BLOCK_ID}`]: () => ({ json: { object: "block", id: BLOCK_ID, type: "paragraph", parent: { type: "page_id", page_id: PAGE_ID } } }),
-    [`PATCH /blocks/${PAGE_ID}/children`]: () => ({ json: { results: [] } }),
+    [`PATCH /blocks/${PAGE_ID}/children`]: () => ({ json: { results: [{ id: "a", type: "bulleted_list_item" }, { id: "b", type: "bulleted_list_item" }] } }),
   });
   try {
     const execute = createToolExecutor({ notion: new NotionClient("t"), currentPageId: null, runPageTool: async () => ({ ok: false, content: "n/a" }) });
