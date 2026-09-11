@@ -2,6 +2,15 @@
 
 export type BrainId = "claude" | "codex";
 
+export type Theme = "system" | "light" | "dark";
+
+export const THEMES: readonly Theme[] = ["system", "light", "dark"];
+
+/** Narrows an unvalidated value (a DOM dataset, a hand-edited settings file) to a Theme. */
+export function asTheme(value: unknown): Theme {
+  return THEMES.includes(value as Theme) ? (value as Theme) : "system";
+}
+
 export interface Settings {
   brain: BrainId;
   /** Explicit CLI paths; empty means auto-detect. */
@@ -25,6 +34,8 @@ export interface Settings {
    * account. "notion-app" falls back to typing into Notion Calendar, which cannot read anything.
    */
   calendarBackend: "system" | "notion-app";
+  /** "system" follows the OS appearance; the other two override it. */
+  theme: Theme;
   setupComplete: boolean;
 }
 
@@ -41,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarAutoSave: false,
   calendarStrategy: "new-event-key",
   calendarBackend: "system",
+  theme: "system",
   setupComplete: false,
 };
 

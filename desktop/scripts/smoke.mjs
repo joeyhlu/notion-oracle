@@ -146,6 +146,56 @@ for (const ready of [true, false]) {
 }
 }
 
+/*
+ * Appearance. The stylesheet has to win against the OS in both directions, and that is exactly
+ * what a screenshot of either theme on its own cannot show: forcing light on a dark OS relies on
+ * a :not() in the media query, and forcing dark on a light OS relies on a separate attribute
+ * block. Each combination is rendered and the painted colour read back.
+ */
+{
+  const page = await browser.newPage({ viewport: { width: 420, height: 620 } });
+  await page.addInitScript(installBridge, true);
+
+  /** The colour the panel actually paints under this OS setting and this explicit choice. */
+  const paint = async (os, choice) => {
+    await page.emulateMedia({ colorScheme: os });
+    await page.evaluate((c) => {
+      if (c === "system") delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = c;
+    }, choice);
+    return page.evaluate(() => getComputedStyle(document.querySelector(".panel")).backgroundColor);
+  };
+
+  await page.goto(page_url);
+  await page.evaluate(() => { document.body.className = "expanded"; });
+
+  const lightPaper = await paint("light", "system");
+  const darkPaper = await paint("dark", "system");
+  check("theme: the OS setting is followed by default", lightPaper !== darkPaper, true);
+  check("theme: dark OS gives the dark panel", await paint("dark", "system"), darkPaper);
+  check("theme: light is honoured on a dark OS", await paint("dark", "light"), lightPaper);
+  check("theme: dark is honoured on a light OS", await paint("light", "dark"), darkPaper);
+  check("theme: back to system follows the OS again", await paint("dark", "system"), darkPaper);
+
+  // The control has to show which one is active, or the choice is invisible once made.
+  await page.emulateMedia({ colorScheme: "light" });
+  for (const choice of ["system", "light", "dark"]) {
+    await page.evaluate((c) => {
+      document.querySelector(`.seg[data-theme-value="${c}"]`).click();
+    }, choice);
+    check(`theme: ${choice} segment marked active`, await page.evaluate(
+      () => [...document.querySelectorAll(".seg.active")].map((s) => s.dataset.themeValue)), [choice]);
+    check(`theme: ${choice} applied to the document`, await page.evaluate(
+      () => document.documentElement.dataset.theme ?? "system"), choice);
+  }
+  if (out) {
+    await page.click("#btn-settings");
+    await page.evaluate(() => document.getElementById("step-prefs").classList.add("open"));
+    await page.screenshot({ path: join(out, "theme-control.png") });
+  }
+  await page.close();
+}
+
 await browser.close();
 
 if (failures.length) {

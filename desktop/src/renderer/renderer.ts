@@ -1,7 +1,7 @@
 /** Overlay UI: a collapsed pill, the chat panel, and the setup/settings view. */
 
 import { markdownToHtml } from "../../../extension/src/lib/markdown.ts";
-import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, type BrainId, type ChatEvent, type Settings } from "../shared/types.ts";
+import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -257,6 +257,7 @@ async function saveSetup(): Promise<void> {
     calendarAutoSave: $<HTMLInputElement>("calendar-autosave").checked,
     calendarStrategy: $<HTMLSelectElement>("calendar-strategy").value === "command-bar" ? "command-bar" : "new-event-key",
     calendarBackend: $<HTMLSelectElement>("calendar-backend").value === "notion-app" ? "notion-app" : "system",
+    theme: asTheme(document.documentElement.dataset.theme ?? "system"),
     setupComplete: true,
   };
   const cliPath = $<HTMLInputElement>("cli-path").value.trim();
@@ -330,6 +331,24 @@ function renderFaq(): void {
   }
 }
 
+
+/**
+ * Paints the chosen appearance and marks the segmented control.
+ *
+ * "system" deliberately removes the attribute rather than resolving it here: the stylesheet
+ * already follows prefers-color-scheme, so leaving it unstamped keeps the OS in charge and the
+ * window repaints when the OS flips without the renderer having to watch for it.
+ */
+function applyTheme(theme: Theme): void {
+  const root = document.documentElement;
+  if (theme === "system") delete root.dataset.theme;
+  else root.dataset.theme = theme;
+  for (const seg of document.querySelectorAll<HTMLButtonElement>("#theme-toggle .seg")) {
+    const chosen = seg.dataset.themeValue === theme;
+    seg.classList.toggle("active", chosen);
+    seg.setAttribute("aria-checked", String(chosen));
+  }
+}
 
 /** Opens one setup step and closes the others, so the screen never becomes a wall of forms. */
 function openStep(name: string): void {
@@ -418,6 +437,16 @@ function wireControls(): void {
   $("btn-settings").addEventListener("click", () => showView($("view-setup").hidden ? "setup" : "chat"));
   $("btn-help").addEventListener("click", () => showView($("view-help").hidden ? "help" : "chat"));
   $("btn-help-setup").addEventListener("click", () => showView("setup"));
+
+  $("theme-toggle").addEventListener("click", (event) => {
+    const seg = (event.target as HTMLElement).closest<HTMLButtonElement>(".seg");
+    if (!seg) return;
+    const theme = asTheme(seg.dataset.themeValue);
+    applyTheme(theme);
+    // Persisted straight away rather than on Save, so the choice survives a restart even if the
+    // user just came to change the colour and closed the panel.
+    void window.oracle.saveSettings({ theme }).then((next) => { settings = next; });
+  });
   $("banner-setup").addEventListener("click", () => showView("setup"));
   for (const head of document.querySelectorAll<HTMLElement>(".step-head")) {
     head.addEventListener("click", () => {
@@ -466,6 +495,7 @@ function wireControls(): void {
 async function loadState(): Promise<void> {
   platform = await window.oracle.platform();
   settings = await window.oracle.getSettings();
+  applyTheme(settings.theme);
   $("brain-label").textContent = BRAIN_LABELS[settings.brain];
   showView(settings.setupComplete ? "chat" : "setup");
   void refreshSetupStatus();

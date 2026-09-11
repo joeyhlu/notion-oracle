@@ -132,10 +132,17 @@
         <button class="step-head" data-step="prefs">
           <span class="step-badge ok">✓</span>
           <span class="step-title">Preferences</span>
-          <span class="step-note">Shortcut and behaviour</span>
+          <span class="step-note">Appearance and shortcut</span>
           <span class="chev">›</span>
         </button>
         <div class="step-body">
+          <label id="theme-label">Appearance</label>
+          <div class="segmented" id="theme-toggle" role="radiogroup" aria-labelledby="theme-label">
+            <button type="button" class="seg" data-theme-value="system" role="radio" aria-checked="false">System</button>
+            <button type="button" class="seg" data-theme-value="light" role="radio" aria-checked="false">Light</button>
+            <button type="button" class="seg" data-theme-value="dark" role="radio" aria-checked="false">Dark</button>
+          </div>
+          <p class="muted" id="theme-note">System follows your Mac or Windows appearance setting.</p>
           <label>Always tell Oracle…<textarea id="custom-instructions" rows="2" placeholder="e.g. My tasks live in the Tasks database. Keep summaries under 5 bullets."></textarea></label>
           <label>Keyboard shortcut<input type="text" id="hotkey" placeholder="CommandOrControl+Shift+Space"></label>
           <label class="checkbox"><input type="checkbox" id="follow-notion"> Only show the ◎ button while Notion is in front</label>

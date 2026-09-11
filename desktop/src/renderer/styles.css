@@ -39,8 +39,18 @@
   color-scheme: light dark;
 }
 
+/*
+ * Three appearance states. "System" stamps no attribute and follows the OS, so the very first
+ * paint is already correct — the renderer cannot set an attribute before the stylesheet applies,
+ * and the content security policy rules out the usual inline head script. The two explicit
+ * choices then have to beat the OS in *both* directions, which is what the :not() buys: the
+ * media block stands down when the user has forced light, and the attribute block below adds
+ * dark when the OS did not.
+ *
+ * The two dark blocks are necessarily identical; a test asserts they stay that way.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #16161a;
     --paper-2: #202024;
     --ink: #ececeb;
@@ -59,6 +69,29 @@
     --user-bubble: #26262c;
   }
 }
+
+:root[data-theme="dark"] {
+    --paper: #16161a;
+    --paper-2: #202024;
+    --ink: #ececeb;
+    --ink-2: #a1a1a0;
+    --ink-3: #78787a;
+    --line: #2c2c31;
+    --line-2: #41414a;
+    --solid: #f2f2f0;
+    --solid-fg: #16161a;
+    --accent: #7ba4ff;
+    --accent-soft: #1d2740;
+    --good: #5fcf95;
+    --good-soft: #16301f;
+    --bad: #f08279;
+    --bad-soft: #33191a;
+    --user-bubble: #26262c;
+  /* Native controls — scrollbars, form widgets, the caret — follow the choice, not the OS. */
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 /*
@@ -277,6 +310,22 @@ body.collapsed .panel { display: none; }
 }
 .view.scroll label.checkbox input { width: auto; margin: 1px 0 0; accent-color: var(--solid); }
 #follow-note { margin-top: 3px; }
+#theme-note { margin-top: 4px; }
+
+/* Segmented control: one bordered track, the chosen segment filled solid. */
+.segmented {
+  display: inline-flex; border: 1px solid var(--line); border-radius: var(--r);
+  overflow: hidden; background: var(--paper);
+}
+.seg {
+  background: none; border: none; border-left: 1px solid var(--line);
+  padding: 4px 12px; font-size: 12px; color: var(--ink-2);
+  transition: background var(--t), color var(--t);
+}
+.seg:first-child { border-left: none; }
+.seg:hover { background: var(--paper-2); color: var(--ink); }
+.seg.active { background: var(--solid); color: var(--solid-fg); }
+.seg.active:hover { background: var(--solid); }
 
 /* ---------- Setup steps ---------- */
 /*
