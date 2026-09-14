@@ -14,6 +14,7 @@
       <div class="title"><span class="dot"></span>Oracle</div>
       <span id="brain-label" class="model"></span>
       <button class="icon-btn" id="btn-new" title="New conversation">+</button>
+      <button class="icon-btn" id="btn-history" title="Past conversations">☰</button>
       <button class="icon-btn" id="btn-changes" title="What Oracle changed">⟲</button>
       <button class="icon-btn" id="btn-help" title="Help &amp; FAQ">?</button>
       <button class="icon-btn" id="btn-settings" title="Setup">⚙</button>
@@ -155,6 +156,18 @@
         <button id="btn-save" class="send">Save</button>
         <span id="save-status" class="muted"></span>
         <button id="btn-quit" class="chip quit">Quit Oracle</button>
+      </div>
+    </section>
+
+    <!-- ---------- History ---------- -->
+    <section id="view-history" class="view scroll" hidden>
+      <div class="view-head">
+        <h1>Conversations</h1>
+        <p class="muted">Pick one up where you left it. Oracle remembers the whole thread, not just the text.</p>
+      </div>
+      <div id="history"></div>
+      <div class="setup-footer">
+        <button id="btn-new-from-history" class="chip">Start a new one</button>
       </div>
     </section>
 

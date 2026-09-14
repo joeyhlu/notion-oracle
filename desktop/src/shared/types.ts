@@ -1,8 +1,10 @@
 /** Contract between the Electron main process and the renderer. */
 
 import type { Change } from "./journal.ts";
+import type { Conversation, ConversationSummary } from "./conversations.ts";
 
 export type { Change } from "./journal.ts";
+export type { Conversation, ConversationSummary, Message } from "./conversations.ts";
 
 export type BrainId = "claude" | "codex";
 
@@ -76,12 +78,14 @@ export type ChatEvent =
   | { type: "tool-start"; id: string; name: string; input: unknown }
   | { type: "tool-end"; id: string; name: string; ok: boolean; summary: string }
   /** `changes` is attached by the main process; a brain does not know what its tools touched. */
-  | { type: "done"; threadId: string | null; text: string; changes?: Change[] }
+  | { type: "done"; threadId: string | null; text: string; changes?: Change[]; conversationId?: string }
   | { type: "error"; message: string; threadId: string | null };
 
 export interface ChatRequest {
   text: string;
   threadId: string | null;
+  /** Which saved conversation this turn belongs to, so the main process can record it. */
+  conversationId: string | null;
 }
 
 export interface PageHint {
@@ -121,6 +125,9 @@ export interface OracleApi {
   getChanges(): Promise<Change[]>;
   undoChange(id: string): Promise<{ ok: boolean; message: string }>;
   clearChanges(): Promise<void>;
+  listConversations(): Promise<ConversationSummary[]>;
+  getConversation(id: string): Promise<Conversation | null>;
+  deleteConversation(id: string): Promise<void>;
   onChatEvent(callback: (event: ChatEvent) => void): () => void;
   setMode(mode: OverlayMode): Promise<void>;
   onMode(callback: (mode: OverlayMode) => void): () => void;

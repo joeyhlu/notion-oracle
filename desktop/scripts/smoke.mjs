@@ -49,6 +49,11 @@ function installBridge(ready) {
       return { ok: true, message: "Removed." };
     },
     clearChanges: async () => { window.__changes = []; },
+    listConversations: async () => window.__conversations ?? [],
+    getConversation: async (id) => (window.__saved ?? {})[id] ?? null,
+    deleteConversation: async (id) => {
+      window.__conversations = (window.__conversations ?? []).filter((c) => c.id !== id);
+    },
     setMode: () => {}, openExternal: () => {}, openSignIn: () => {}, quit: () => {},
     onChatEvent: () => {}, onMode: () => {},
   };
@@ -95,8 +100,13 @@ for (const ready of [true, false]) {
   await page.waitForFunction(() => !document.getElementById("setup-summary").textContent.startsWith("Checking"));
 
   /** Ids of the views the browser is actually painting. */
-  const shown = () => page.evaluate(() => ["view-chat", "view-setup", "view-help", "view-changes"]
-    .filter((id) => getComputedStyle(document.getElementById(id)).display !== "none"));
+  /**
+   * Which views the browser is actually painting. Derived from the DOM rather than a list here:
+   * a hard-coded list silently stops covering any view added later, which is exactly the kind of
+   * gap that let three stacked views ship.
+   */
+  const shown = () => page.evaluate(() => [...document.querySelectorAll(".view")]
+    .filter((el) => getComputedStyle(el).display !== "none").map((el) => el.id));
   const displayed = (id) => page.evaluate(
     (x) => getComputedStyle(document.getElementById(x)).display !== "none", id);
   const shot = (name) => out && page.screenshot({ path: join(out, `${state}-${name}.png`) });
@@ -176,6 +186,29 @@ for (const ready of [true, false]) {
   await page.waitForFunction(() => document.querySelectorAll("#changes .change.undone").length === 1);
   check(`${state}: undo marks the row`, await page.locator("#changes .change.undone").count(), 1);
   await shot("changes");
+
+  // History: an empty state, then a saved conversation that reopens with its transcript redrawn.
+  await page.evaluate(() => { window.__conversations = []; });
+  await page.click("#btn-history");
+  check(`${state}: history only`, await shown(), ["view-history"]);
+  check(`${state}: history empty state`, await page.locator("#history .empty").count(), 1);
+
+  await page.evaluate(() => {
+    window.__conversations = [{ id: "k1", title: "Summarize my notes", updatedAt: new Date().toISOString(), messageCount: 2 }];
+    window.__saved = { k1: { id: "k1", threadId: "cli-1", title: "Summarize my notes", createdAt: "", updatedAt: "",
+      messages: [{ role: "user", text: "Summarize my notes" }, { role: "assistant", text: "**Three** points." }] } };
+  });
+  await page.click("#btn-history");
+  await page.click("#btn-history");
+  check(`${state}: one row per conversation`, await page.locator("#history .change").count(), 1);
+  await shot("history");
+
+  await page.locator("#history .change-main").first().click();
+  await page.waitForFunction(() => !document.getElementById("view-chat").hidden);
+  check(`${state}: reopening returns to chat`, await shown(), ["view-chat"]);
+  check(`${state}: transcript is redrawn`, await page.locator("#messages .msg").count(), 2);
+  // Markdown is re-rendered, not shown as source.
+  check(`${state}: reply keeps its formatting`, await page.locator("#messages .msg.assistant strong").innerText(), "Three");
 
   check(`${state}: console clean`, noise, []);
   await page.close();

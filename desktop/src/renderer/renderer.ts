@@ -3,10 +3,11 @@
 import { markdownToHtml } from "../../../extension/src/lib/markdown.ts";
 import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type Change, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
 import { summarise } from "../shared/journal.ts";
+import { titleFrom, type Conversation } from "../shared/conversations.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
-type View = "chat" | "setup" | "help" | "changes";
+type View = "chat" | "setup" | "help" | "changes" | "history";
 
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
@@ -17,6 +18,8 @@ const QUICK_ACTIONS = [
 
 let settings: Settings;
 let threadId: string | null = null;
+/** Which saved conversation the current chat is; null until the first message creates one. */
+let conversationId: string | null = null;
 let busy = false;
 let platform: NodeJS.Platform = "darwin";
 
@@ -38,7 +41,9 @@ function showView(view: View): void {
   $("view-setup").hidden = view !== "setup";
   $("view-help").hidden = view !== "help";
   $("view-changes").hidden = view !== "changes";
+  $("view-history").hidden = view !== "history";
   if (view === "changes") void renderChanges();
+  if (view === "history") void renderHistory();
   if (view === "setup") void loadSetupForm();
   else if (view === "chat") setTimeout(() => $("input").focus(), 50);
 }
@@ -127,7 +132,7 @@ async function send(text: string): Promise<void> {
   scrollToBottom();
   currentTurn = { body, tools, thinking, status, raw: "", toolNodes: new Map(), container };
   setBusy(true);
-  await window.oracle.chatSend({ text: trimmed, threadId });
+  await window.oracle.chatSend({ text: trimmed, threadId, conversationId });
 }
 
 function handleEvent(event: ChatEvent): void {
@@ -171,6 +176,7 @@ function handleEvent(event: ChatEvent): void {
     }
     case "done": {
       threadId = event.threadId;
+      conversationId = event.conversationId ?? conversationId;
       finishTurn();
       if (turn.raw.trim()) addActions(turn.container, turn.raw);
       // What actually changed, from the journal rather than from the model's own account of it:
@@ -217,6 +223,8 @@ function addActions(container: HTMLElement, text: string): void {
 function resetConversation(): void {
   if (busy) void window.oracle.chatAbort();
   threadId = null;
+  // Without this, "new conversation" keeps appending to the saved one it just left.
+  conversationId = null;
   currentTurn = null;
   setBusy(false);
   renderEmpty();
@@ -286,7 +294,9 @@ async function saveSetup(): Promise<void> {
   settings = await window.oracle.saveSettings(patch);
   $("brain-label").textContent = BRAIN_LABELS[settings.brain];
   $("save-status").textContent = "Saved.";
+  // Changing brain or model means the CLI session no longer applies.
   threadId = null;
+  conversationId = null;
   void refreshSetupStatus();
   showView("chat");
 }
@@ -379,6 +389,67 @@ function ago(iso: string): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
+}
+
+async function renderHistory(): Promise<void> {
+  const host = $("history");
+  const saved = await window.oracle.listConversations();
+  host.replaceChildren();
+  if (!saved.length) {
+    host.appendChild(el("div", "empty", "No saved conversations yet. They are kept on this machine once you send a message."));
+    return;
+  }
+  for (const item of saved) {
+    const row = el("div", `change${item.id === conversationId ? " current" : ""}`);
+    const main = el("div", "change-main");
+    main.append(el("div", "change-label", item.title), el("div", "change-when", `${ago(item.updatedAt)} · ${item.messageCount} message${item.messageCount === 1 ? "" : "s"}`));
+    main.addEventListener("click", () => void openConversation(item.id));
+    row.appendChild(main);
+
+    const remove = el("button", "chip", "Delete") as HTMLButtonElement;
+    remove.addEventListener("click", async () => {
+      await window.oracle.deleteConversation(item.id);
+      // Deleting the open conversation leaves the panel showing a thread that no longer exists.
+      if (item.id === conversationId) startNewConversation();
+      void renderHistory();
+    });
+    row.appendChild(remove);
+    host.appendChild(row);
+  }
+}
+
+/** Redraws a saved conversation and points the next turn at the CLI session that produced it. */
+async function openConversation(id: string): Promise<void> {
+  const conversation = await window.oracle.getConversation(id);
+  if (!conversation) {
+    void renderHistory();
+    return;
+  }
+  conversationId = conversation.id;
+  threadId = conversation.threadId;
+  messages().replaceChildren();
+  for (const message of conversation.messages) {
+    if (message.role === "user") messages().appendChild(el("div", "msg user", message.text));
+    else renderSavedReply(message.text);
+  }
+  showView("chat");
+  scrollToBottom();
+}
+
+/** A saved assistant turn: the Markdown is re-rendered, but its tool log is not kept. */
+function renderSavedReply(text: string): void {
+  const container = el("div", "msg assistant");
+  const body = el("div", "body");
+  body.innerHTML = markdownToHtml(text);
+  container.appendChild(body);
+  addActions(container, text);
+  messages().appendChild(container);
+}
+
+function startNewConversation(): void {
+  threadId = null;
+  conversationId = null;
+  renderEmpty();
 }
 
 async function renderChanges(): Promise<void> {
@@ -518,6 +589,11 @@ function wireControls(): void {
   $("btn-settings").addEventListener("click", () => showView($("view-setup").hidden ? "setup" : "chat"));
   $("btn-help").addEventListener("click", () => showView($("view-help").hidden ? "help" : "chat"));
   $("btn-changes").addEventListener("click", () => showView($("view-changes").hidden ? "changes" : "chat"));
+  $("btn-history").addEventListener("click", () => showView($("view-history").hidden ? "history" : "chat"));
+  $("btn-new-from-history").addEventListener("click", () => {
+    startNewConversation();
+    showView("chat");
+  });
   $("btn-clear-changes").addEventListener("click", async () => {
     await window.oracle.clearChanges();
     void renderChanges();

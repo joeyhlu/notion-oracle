@@ -19,6 +19,8 @@ import { openTerminal } from "./terminal.ts";
 import { readChanges, rewriteChanges } from "../shared/journal-file.ts";
 import type { Change } from "../shared/journal.ts";
 import { undoChange } from "./undo.ts";
+import { ConversationStore } from "../shared/conversations-file.ts";
+import { newConversationId, titleFrom, type Conversation } from "../shared/conversations.ts";
 
 const COLLAPSED = { width: 64, height: 64 };
 const EXPANDED = { width: 420, height: 680 };
@@ -215,6 +217,32 @@ function mcpSpecs(current: Settings): McpServerSpec[] {
 
 const journalPath = (): string => join(app.getPath("userData"), "changes.jsonl");
 
+let conversations: ConversationStore | null = null;
+const store = (): ConversationStore => (conversations ??= new ConversationStore(app.getPath("userData")));
+
+/**
+ * Loads the conversation this turn belongs to, or starts one.
+ *
+ * The user's message is written before the run so a crash mid-reply still leaves a record of what
+ * was asked, which is what makes the conversation worth reopening at all.
+ */
+function openConversation(request: ChatRequest): Conversation {
+  const now = new Date().toISOString();
+  const existing = request.conversationId ? store().get(request.conversationId) : null;
+  const conversation: Conversation = existing ?? {
+    id: request.conversationId ?? newConversationId(),
+    threadId: request.threadId,
+    title: titleFrom(request.text),
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+  conversation.messages.push({ role: "user", text: request.text });
+  conversation.updatedAt = now;
+  store().save(conversation);
+  return conversation;
+}
+
 /** Entries written since `since`, which is how a turn reports only its own changes. */
 function changesSince(since: string): Change[] {
   return readChanges(journalPath()).filter((c) => c.at > since);
@@ -239,7 +267,20 @@ async function runChat(request: ChatRequest): Promise<void> {
   send({ type: "status", message: "Starting…" });
   // Sampled before the run so the turn reports what it changed, not the whole history.
   const startedAt = new Date().toISOString();
-  const withChanges = (event: ChatEvent) => send(event.type === "done" ? { ...event, changes: changesSince(startedAt) } : event);
+  const conversation = openConversation(request);
+  const withChanges = (event: ChatEvent) => {
+    if (event.type === "done") {
+      // Saved with the CLI's session id attached: that is what lets a reopened conversation carry
+      // on rather than start over with the transcript merely redrawn.
+      conversation.threadId = event.threadId ?? conversation.threadId;
+      if (event.text.trim()) conversation.messages.push({ role: "assistant", text: event.text });
+      conversation.updatedAt = new Date().toISOString();
+      store().save(conversation);
+      send({ ...event, changes: changesSince(startedAt), conversationId: conversation.id });
+      return;
+    }
+    send(event);
+  };
   try {
     const hint = { notionWindowTitle: await getNotionWindowTitle() };
     await brain.run({
@@ -298,6 +339,9 @@ function registerIpc(): void {
   ipcMain.handle("oracle:chat-abort", () => activeRun?.abort());
   ipcMain.handle("oracle:get-changes", () => readChanges(journalPath()));
   ipcMain.handle("oracle:clear-changes", () => rewriteChanges(journalPath(), () => null));
+  ipcMain.handle("oracle:list-conversations", () => store().list());
+  ipcMain.handle("oracle:get-conversation", (_e, id: string) => store().get(id));
+  ipcMain.handle("oracle:delete-conversation", (_e, id: string) => store().remove(id));
   ipcMain.handle("oracle:undo-change", async (_e, id: string) => {
     const change = readChanges(journalPath()).find((c) => c.id === id);
     if (!change) return { ok: false, message: "That change is no longer in the list." };

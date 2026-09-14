@@ -15,6 +15,9 @@ const api: OracleApi = {
   getChanges: () => ipcRenderer.invoke("oracle:get-changes"),
   undoChange: (id: string) => ipcRenderer.invoke("oracle:undo-change", id),
   clearChanges: () => ipcRenderer.invoke("oracle:clear-changes"),
+  listConversations: () => ipcRenderer.invoke("oracle:list-conversations"),
+  getConversation: (id: string) => ipcRenderer.invoke("oracle:get-conversation", id),
+  deleteConversation: (id: string) => ipcRenderer.invoke("oracle:delete-conversation", id),
   onChatEvent: (callback: (event: ChatEvent) => void) => {
     const listener = (_: unknown, event: ChatEvent) => callback(event);
     ipcRenderer.on("oracle:chat-event", listener);
