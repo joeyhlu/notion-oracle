@@ -12,48 +12,15 @@
  */
 
 import { execFile } from "node:child_process";
+import { FIELD_SEP, RECORD_SEP, parseCalendars, parseEvents, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
+
+// Re-exported so existing callers and tests keep importing them from here.
+export { parseCalendars, parseEvents };
+export type { CalendarEvent, CalendarInfo, CreateEventInput, UpdateEventInput };
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** Field and record separators: control characters that cannot appear in calendar text. */
-const FIELD_SEP = String.fromCharCode(31);
-const RECORD_SEP = String.fromCharCode(30);
-
-export interface CalendarInfo {
-  name: string;
-  writable: boolean;
-  description: string;
-}
-
-export interface CalendarEvent {
-  uid: string;
-  calendar: string;
-  title: string;
-  start: string;
-  end: string;
-  allDay: boolean;
-  location: string;
-}
-
-export interface CreateEventInput {
-  title: string;
-  start: string;
-  end?: string;
-  allDay?: boolean;
-  calendar?: string;
-  location?: string;
-  notes?: string;
-}
-
-export interface UpdateEventInput {
-  uid: string;
-  calendar: string;
-  title?: string;
-  start?: string;
-  end?: string;
-  location?: string;
-  notes?: string;
-}
 
 // ---------- escaping and dates ----------
 
@@ -233,30 +200,6 @@ export function deleteEventScript(uid: string, calendar: string): string {
 
 // ---------- output parsing ----------
 
-function records(stdout: string): string[][] {
-  return stdout
-    .split(RECORD_SEP)
-    .map((r) => r.trim())
-    .filter(Boolean)
-    .map((r) => r.split(FIELD_SEP));
-}
-
-export function parseCalendars(stdout: string): CalendarInfo[] {
-  return records(stdout).map((f) => ({ name: f[0] ?? "", writable: (f[1] ?? "").toLowerCase() === "true", description: f[2] ?? "" }));
-}
-
-export function parseEvents(stdout: string): CalendarEvent[] {
-  return records(stdout).map((f) => ({
-    uid: f[0] ?? "",
-    calendar: f[1] ?? "",
-    title: f[2] ?? "",
-    start: f[3] ?? "",
-    end: f[4] ?? "",
-    allDay: (f[5] ?? "").toLowerCase() === "true",
-    location: f[6] ?? "",
-  }));
-}
-
 // ---------- execution ----------
 
 const PERMISSION_HELP =
@@ -356,14 +299,18 @@ export function readDefaultCalendar(): string {
   }
 }
 
-export async function setDefaultCalendar(name: string): Promise<string> {
-  assertMac();
-  const resolved = await resolveCalendar(name);
+/** Persists an already-resolved calendar name. Backend-neutral: both platforms share the file. */
+export function writeDefaultCalendar(resolved: string): string {
   const file = defaultCalendarFile();
   if (!file) throw new Error("Nowhere to save the default calendar; restart Notion Oracle and try again.");
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify({ calendar: resolved }, null, 2));
   return resolved;
+}
+
+export async function setDefaultCalendar(name: string): Promise<string> {
+  assertMac();
+  return writeDefaultCalendar(await resolveCalendar(name));
 }
 
 export async function listEvents(from: string, to: string, calendar?: string): Promise<CalendarEvent[]> {

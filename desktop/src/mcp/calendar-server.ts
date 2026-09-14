@@ -7,6 +7,7 @@
 import type { ToolDefinition, ToolExecutor } from "../../../extension/src/lib/providers/types.ts";
 import { APP_NAME, activateCalendarApp, calendarAppStatus, createCalendarEvent, openCalendarDate, parseWhen, type Strategy } from "./calendar-app.ts";
 import * as mac from "./mac-calendar.ts";
+import * as win from "./win-calendar.ts";
 import { CALENDAR_TOOL_NAMES } from "./calendar-tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
 import { appendChange } from "../shared/journal-file.ts";
@@ -20,12 +21,47 @@ const AUTO_SAVE = process.env.CALENDAR_AUTO_SAVE === "1";
  * Calendar app is the fallback for Windows, or when the user has not added their account to
  * macOS. Prefer the system calendar whenever it is available.
  */
-const SYSTEM_CALENDAR = process.platform === "darwin" && process.env.CALENDAR_BACKEND !== "notion-app";
+const SYSTEM_CALENDAR = (process.platform === "darwin" || process.platform === "win32") && process.env.CALENDAR_BACKEND !== "notion-app";
+
+/**
+ * The two real backends behind one shape.
+ *
+ * macOS scripts Calendar.app and Windows automates Outlook; the tools above must not care which.
+ * The adapters exist because the two disagree on small things — an Outlook EntryID identifies an
+ * event globally, so find and delete do not need the calendar name, and Outlook can genuinely
+ * move an item between folders where AppleScript has to copy and delete.
+ */
+/** What to call the backend in tool descriptions and messages the user will read. */
+const BACKEND_NAME = process.platform === "win32" ? "Outlook" : "the macOS Calendar app";
+
+const backend = process.platform === "win32"
+  ? {
+      kind: "outlook" as const,
+      listCalendars: () => win.listCalendars(),
+      listEvents: (from: string, to: string, calendar?: string) => win.listEvents(from, to, calendar),
+      createEvent: async (input: mac.CreateEventInput) => win.createEvent({ ...input, calendar: await win.resolveCalendar(input.calendar, mac.readDefaultCalendar()) }),
+      updateEvent: (input: mac.UpdateEventInput) => win.updateEvent(input),
+      deleteEvent: (uid: string) => win.deleteEvent(uid),
+      findEvent: (uid: string) => win.findEvent(uid),
+      moveEvent: (uid: string, _from: string, to: string) => win.moveEvent(uid, to),
+      resolveCalendar: (requested?: string) => win.resolveCalendar(requested, mac.readDefaultCalendar()),
+    }
+  : {
+      kind: "calendar-app" as const,
+      listCalendars: () => mac.listCalendars(),
+      listEvents: (from: string, to: string, calendar?: string) => mac.listEvents(from, to, calendar),
+      createEvent: (input: mac.CreateEventInput) => mac.createEvent(input),
+      updateEvent: (input: mac.UpdateEventInput) => mac.updateEvent(input),
+      deleteEvent: (uid: string, calendar: string) => mac.deleteEvent(uid, calendar),
+      findEvent: (uid: string, calendar: string) => mac.findEvent(uid, calendar),
+      moveEvent: (uid: string, from: string, to: string) => mac.moveEvent(uid, from, to),
+      resolveCalendar: (requested?: string) => mac.resolveCalendar(requested),
+    };
 
 const SYSTEM_TOOLS: ToolDefinition[] = [
   {
     name: "calendar_list_calendars",
-    description: "List the user's calendars from the macOS Calendar app, with whether each is writable. Call this when the user has several calendars and it is unclear which one they mean, or before writing if you are unsure a name exists. Subscribed calendars (holidays and the like) are read-only.",
+    description: `List the user's calendars from ${BACKEND_NAME}, with whether each is writable. Call this when the user has several calendars and it is unclear which one they mean, or before writing if you are unsure a name exists. Subscribed calendars (holidays and the like) are read-only.`,
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -45,7 +81,7 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
   {
     name: "calendar_create_event",
     description:
-      "Create an event in the user's real calendar (their Google, iCloud or Outlook account via the macOS Calendar app). It syncs to the account and shows up in Notion Calendar. Resolve relative dates yourself from the context block and pass ISO 8601. A bare date makes an all-day event. Confirm the result to the user with the calendar name it landed in.",
+      `Create an event in the user's real calendar (their Google, iCloud or Outlook account, via ${BACKEND_NAME}). It syncs to the account and shows up in Notion Calendar. Resolve relative dates yourself from the context block and pass ISO 8601. A bare date makes an all-day event. Confirm the result to the user with the calendar name it landed in.`,
     input_schema: {
       type: "object",
       properties: {
@@ -123,7 +159,7 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
 const NOTION_APP_TOOLS: ToolDefinition[] = [
   {
     name: "calendar_status",
-    description: `Check how calendar access is set up: whether the macOS Calendar app can be scripted, or whether the ${APP_NAME} app is running for keystroke fallback. Call this first if a calendar tool fails, and relay the setup guidance it returns.`,
+    description: `Check how calendar access is set up: whether ${BACKEND_NAME} can be reached, or whether the ${APP_NAME} app is running for keystroke fallback. Call this first if a calendar tool fails, and relay the setup guidance it returns.`,
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -175,12 +211,23 @@ const ok = (content: unknown) => ({ ok: true, content: typeof content === "strin
 const fail = (message: string) => ({ ok: false, content: message });
 
 /** Both paths, so the model can tell the user exactly what to fix when one is unavailable. */
+/** Saves the preferred calendar after checking the backend actually has one by that name. */
+async function setDefault(name: string): Promise<string> {
+  const resolved = await backend.resolveCalendar(name);
+  return mac.writeDefaultCalendar(resolved);
+}
+
 async function status(): Promise<Record<string, unknown>> {
   const app = await calendarAppStatus();
   const base = { notion_calendar_app: app, default_backend: SYSTEM_CALENDAR ? "system-calendar" : "notion-app-keystrokes" };
-  if (!SYSTEM_CALENDAR) return { ...base, system_calendar: { available: false, reason: process.platform === "darwin" ? "Disabled in settings." : "Only macOS exposes a scriptable system calendar." } };
+  if (!SYSTEM_CALENDAR) {
+    const reason = process.platform === "darwin" || process.platform === "win32"
+      ? "Disabled in settings."
+      : "Only macOS and Windows have a calendar Oracle can read and write; this machine gets the create-only fallback.";
+    return { ...base, system_calendar: { available: false, reason } };
+  }
   try {
-    const calendars = await mac.listCalendars();
+    const calendars = await backend.listCalendars();
     const saved = mac.readDefaultCalendar();
     return {
       ...base,
@@ -219,16 +266,16 @@ export const execute: ToolExecutor = async (name, input) => {
       }
 
       case "calendar_list_calendars":
-        return ok(await mac.listCalendars());
+        return ok(await backend.listCalendars());
 
       case "calendar_list_events": {
-        const events = await mac.listEvents(String(input.from ?? ""), String(input.to ?? ""), input.calendar ? String(input.calendar) : undefined);
+        const events = await backend.listEvents(String(input.from ?? ""), String(input.to ?? ""), input.calendar ? String(input.calendar) : undefined);
         if (!events.length) return ok("No events in that range.");
         return ok(events);
       }
 
       case "calendar_create_event": {
-        const created = await mac.createEvent({
+        const created = await backend.createEvent({
           title: String(input.title ?? ""),
           start: String(input.start ?? ""),
           end: input.end ? String(input.end) : undefined,
@@ -242,19 +289,19 @@ export const execute: ToolExecutor = async (name, input) => {
       }
 
       case "calendar_set_default_calendar": {
-        const chosen = await mac.setDefaultCalendar(String(input.calendar ?? ""));
+        const chosen = await setDefault(String(input.calendar ?? ""));
         return ok({ default_calendar: chosen, note: `New events go to "${chosen}" unless the user names another calendar.` });
       }
 
       case "calendar_move_event": {
-        const moved = await mac.moveEvent(String(input.uid ?? ""), String(input.from_calendar ?? ""), String(input.to_calendar ?? ""));
+        const moved = await backend.moveEvent(String(input.uid ?? ""), String(input.from_calendar ?? ""), String(input.to_calendar ?? ""));
         return ok({ moved: true, ...moved, note: "The event was recreated in the target calendar, so its uid changed." });
       }
 
       case "calendar_update_event": {
         // Read the event before changing it; there is no other way back to its old fields.
-        const before = await mac.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
-        await mac.updateEvent({
+        const before = await backend.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
+        await backend.updateEvent({
           uid: String(input.uid ?? ""),
           calendar: String(input.calendar ?? ""),
           title: input.title === undefined ? undefined : String(input.title),
@@ -271,8 +318,8 @@ export const execute: ToolExecutor = async (name, input) => {
       case "calendar_delete_event": {
         // Calendar.app has no trash, so the fields are the only copy: capture them or the delete
         // really is final.
-        const doomed = await mac.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
-        await mac.deleteEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
+        const doomed = await backend.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
+        await backend.deleteEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
         record({ tool: "calendar", kind: "event", action: "delete", label: `Deleted "${doomed?.title ?? "an event"}"`, target: String(input.calendar ?? ""),
           undo: doomed ? { type: "restore-event", uid: String(input.uid ?? ""), calendar: String(input.calendar ?? ""), fields: { ...doomed } } : undefined });
         return ok({ deleted: true, uid: input.uid });
@@ -298,7 +345,7 @@ export const server = new StdioMcpServer({
   name: "notion-oracle-calendar",
   version: "0.1.0",
   instructions: SYSTEM_CALENDAR
-    ? `Tools for the user's real calendar (their Google, iCloud or Outlook account) through the macOS Calendar app, which syncs to the account and shows up in ${APP_NAME}. Reading, creating, updating and deleting all work. If a tool reports a permission or setup problem, relay its instructions to the user instead of retrying.`
+    ? `Tools for the user's real calendar (their Google, iCloud or Outlook account) through ${BACKEND_NAME}, which syncs to the account and shows up in ${APP_NAME}. Reading, creating, updating and deleting all work. If a tool reports a permission or setup problem, relay its instructions to the user instead of retrying.`
     : `Tools that control the ${APP_NAME} desktop app by keystrokes, which is the only option on this platform. The app must be open. Creating an event cannot be read back, so ask the user to confirm the result.`,
   tools: CALENDAR_TOOLS,
   execute,

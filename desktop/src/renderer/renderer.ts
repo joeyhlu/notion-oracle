@@ -551,7 +551,7 @@ async function refreshSetupStatus(): Promise<void> {
   setBadge("notion", notionReady ? "ok" : "warn", notionReady ? "Connected" : "Needed to read your pages");
 
   if (!settings.calendarAutomation) setBadge("calendar", "optional", "Turned off");
-  else if (platform === "darwin" && settings.calendarBackend === "system") setBadge("calendar", "ok", "macOS Calendar");
+  else if (settings.calendarBackend === "system" && (platform === "darwin" || platform === "win32")) setBadge("calendar", "ok", platform === "win32" ? "Outlook" : "macOS Calendar");
   else setBadge("calendar", "optional", "Notion Calendar fallback");
 
   let aiReady = false;
