@@ -13,6 +13,7 @@ import type { Brain, McpServerSpec } from "./brains/types.ts";
 import { checkBrain, resolveCli } from "./cli.ts";
 import { FrontmostWatcher, isNotionApp, resetFrontmostSupport, shouldShowOverlay, type FrontmostSample } from "./frontmost.ts";
 import { getNotionWindowTitle } from "./notion-window.ts";
+import { getNotionSelection } from "./selection.ts";
 import { buildSystemPrompt, buildUserTurn } from "./prompt.ts";
 import { SettingsStore } from "./settings.ts";
 import { openTerminal } from "./terminal.ts";
@@ -282,7 +283,12 @@ async function runChat(request: ChatRequest): Promise<void> {
     send(event);
   };
   try {
-    const hint = { notionWindowTitle: await getNotionWindowTitle() };
+    // Read together: both shell out, and the selection must reflect the moment of sending.
+    const [notionWindowTitle, selection] = await Promise.all([
+      getNotionWindowTitle(),
+      current.readSelection ? getNotionSelection() : Promise.resolve(null),
+    ]);
+    const hint = { notionWindowTitle, selection };
     await brain.run({
       cliPath,
       prompt: buildUserTurn(request.text, hint),
@@ -333,7 +339,13 @@ function registerIpc(): void {
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle("oracle:page-hint", async () => ({ notionWindowTitle: await getNotionWindowTitle() }));
+  ipcMain.handle("oracle:page-hint", async () => {
+    const [notionWindowTitle, selection] = await Promise.all([
+      getNotionWindowTitle(),
+      settings.get().readSelection ? getNotionSelection() : Promise.resolve(null),
+    ]);
+    return { notionWindowTitle, selection };
+  });
   ipcMain.handle("oracle:platform", () => process.platform);
   ipcMain.handle("oracle:chat-send", (_e, request: ChatRequest) => void runChat(request));
   ipcMain.handle("oracle:chat-abort", () => activeRun?.abort());

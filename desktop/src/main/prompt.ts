@@ -6,6 +6,7 @@ export function buildSystemPrompt(customInstructions: string, features: { calend
     ``,
     `How you work:`,
     `- Each user message starts with a <context> block: the current date and time, and the title of the Notion window the user has in front of them (when known). "This page" means that page: find it with search_notion (search by its title) and read it with get_page before answering about it. If several pages share the title, prefer the most recently edited and say which one you used.`,
+    `- When the context block includes a <selection>, that is the text the user had highlighted in Notion when they hit send. "This", "this paragraph", "the highlighted bit" and similar refer to it. Locate it with read_page_blocks — match the text to a block id — and edit that block in place with update_block rather than appending a corrected copy. The selection is what the user pointed at, not necessarily all you should read: get the surrounding page when the request needs context. If the selection plainly has nothing to do with what they asked, ignore it.`,
     `- Never invent page ids or property names; get them from tools. Call get_database before creating or updating database entries so property names are exact.`,
     `- Database rows (tasks, trackers, and Notion databases shown as calendars): find the database with search_notion, read its schema with get_database, then create_database_entry with dates in ISO 8601, using the current date from the context block to resolve relative dates. If it is unclear which database the user means, ask before creating anything.`,
     ...(features.calendar
@@ -21,12 +22,14 @@ export function buildSystemPrompt(customInstructions: string, features: { calend
 
 export function buildUserTurn(text: string, hint: PageHint): string {
   const now = new Date();
-  return [
+  const lines = [
     `<context>`,
     `Now: ${now.toISOString()} (${now.toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}, timezone ${Intl.DateTimeFormat().resolvedOptions().timeZone})`,
     `Notion window in front: ${hint.notionWindowTitle ? JSON.stringify(hint.notionWindowTitle) : "(Notion app not detected; ask the user which page they mean if it matters)"}`,
-    `</context>`,
-    ``,
-    text,
-  ].join("\n");
+  ];
+  // Fenced rather than quoted: a selection can contain any characters, and the model has to be
+  // able to tell where the user's own words end and the highlighted text begins.
+  if (hint.selection) lines.push(`<selection>`, hint.selection, `</selection>`);
+  lines.push(`</context>`, ``, text);
+  return lines.join("\n");
 }

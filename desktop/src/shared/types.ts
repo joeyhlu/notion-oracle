@@ -42,6 +42,13 @@ export interface Settings {
   calendarBackend: "system" | "notion-app";
   /** "system" follows the OS appearance; the other two override it. */
   theme: Theme;
+  /**
+   * Read the text highlighted in Notion and include it with the message.
+   *
+   * Separate from everything else because it needs the macOS Accessibility permission, which is
+   * broader than the rest of what Oracle does: it is the one grant that could read other apps.
+   */
+  readSelection: boolean;
   setupComplete: boolean;
 }
 
@@ -59,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarStrategy: "new-event-key",
   calendarBackend: "system",
   theme: "system",
+  readSelection: true,
   setupComplete: false,
 };
 
@@ -91,6 +99,8 @@ export interface ChatRequest {
 export interface PageHint {
   /** Title of the Notion window in front, if the Notion desktop app is running. */
   notionWindowTitle: string | null;
+  /** Text highlighted in the Notion app, when macOS accessibility permission allows reading it. */
+  selection?: string | null;
 }
 
 export type OverlayMode = "collapsed" | "expanded";

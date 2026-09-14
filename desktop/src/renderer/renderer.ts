@@ -52,11 +52,21 @@ async function refreshLookingAt(): Promise<void> {
   const el = $("looking-at");
   try {
     const hint = await window.oracle.getPageHint();
+    if (!hint.notionWindowTitle && !hint.selection) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.replaceChildren();
     if (hint.notionWindowTitle) {
-      el.hidden = false;
-      el.innerHTML = `Looking at <strong></strong>`;
-      el.querySelector("strong")!.textContent = hint.notionWindowTitle;
-    } else el.hidden = true;
+      el.append("Looking at ", el2("strong", hint.notionWindowTitle));
+    }
+    // Say so when a selection is in play: the user should know what Oracle can see before
+    // sending, not discover it from the answer.
+    if (hint.selection) {
+      if (hint.notionWindowTitle) el.append(" · ");
+      el.append(el2("span", `${countWords(hint.selection)} selected`, "selected"));
+    }
   } catch {
     el.hidden = true;
   }
@@ -65,6 +75,19 @@ async function refreshLookingAt(): Promise<void> {
 // ---------- Chat ----------
 
 const messages = () => $("messages");
+
+/** A small element with optional text and class, for building the looking-at line. */
+function el2(tag: string, text: string, className = ""): HTMLElement {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.textContent = text;
+  return node;
+}
+
+function countWords(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return words === 1 ? "1 word" : `${words} words`;
+}
 
 function el(tag: string, className: string, text?: string): HTMLElement {
   const node = document.createElement(tag);
@@ -246,6 +269,7 @@ async function loadSetupForm(): Promise<void> {
   $<HTMLInputElement>("hotkey").value = settings.hotkey;
   void refreshSetupStatus();
   $<HTMLInputElement>("follow-notion").checked = settings.followNotion;
+  $<HTMLInputElement>("read-selection").checked = settings.readSelection;
   $<HTMLInputElement>("calendar-automation").checked = settings.calendarAutomation;
   $<HTMLInputElement>("calendar-autosave").checked = settings.calendarAutoSave;
   $<HTMLSelectElement>("calendar-strategy").value = settings.calendarStrategy;
@@ -281,6 +305,7 @@ async function saveSetup(): Promise<void> {
     customInstructions: $<HTMLTextAreaElement>("custom-instructions").value,
     hotkey: $<HTMLInputElement>("hotkey").value.trim() || "CommandOrControl+Shift+Space",
     followNotion: $<HTMLInputElement>("follow-notion").checked,
+    readSelection: $<HTMLInputElement>("read-selection").checked,
     calendarAutomation: $<HTMLInputElement>("calendar-automation").checked,
     calendarAutoSave: $<HTMLInputElement>("calendar-autosave").checked,
     calendarStrategy: $<HTMLSelectElement>("calendar-strategy").value === "command-bar" ? "command-bar" : "new-event-key",
@@ -331,6 +356,10 @@ const FAQ: Array<{ q: string; a: string }> = [
   {
     q: "It says macOS blocked access to Calendar",
     a: "<p>Open <strong>System Settings → Privacy &amp; Security → Automation</strong>, find Notion Oracle, and allow it to control <strong>Calendar</strong>.</p><p>If it also asks about Calendars access, choose <strong>Full Access</strong> — “Add Only” blocks reading and deleting.</p><p>This can reappear after an app update, because macOS ties the permission to each build.</p>",
+  },
+  {
+    q: "Oracle cannot see what I have highlighted",
+    a: "<p>Reading your selection needs the macOS <strong>Accessibility</strong> permission, which is a different one from the calendar and automation prompts. Open <strong>System Settings → Privacy &amp; Security → Accessibility</strong> and switch on <strong>Notion Oracle</strong>, then quit and reopen it.</p><p>When it is working, the line above the message box says how many words are selected. If you would rather Oracle never read it, turn off <strong>Use the text I have highlighted in Notion</strong> in Setup → Preferences; everything else keeps working.</p>",
   },
   {
     q: "Does this cost money?",
