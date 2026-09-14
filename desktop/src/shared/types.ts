@@ -40,6 +40,20 @@ export interface Settings {
    * account. "notion-app" falls back to typing into Notion Calendar, which cannot read anything.
    */
   calendarBackend: "system" | "notion-app";
+  /**
+   * Search the text inside pages, not just their titles.
+   *
+   * Off by default because answering one question reads every candidate page, which is slower and
+   * uses more of the AI subscription than a title search.
+   */
+  contentSearch: boolean;
+  /**
+   * Read and write many database rows at once, for filling a property across a table.
+   *
+   * Off by default because one instruction can rewrite a whole table. Every row it writes is
+   * journalled separately, so a single wrong value can be undone without reverting the pass.
+   */
+  bulkEdit: boolean;
   /** "system" follows the OS appearance; the other two override it. */
   theme: Theme;
   /**
@@ -69,6 +83,8 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarAutoSave: false,
   calendarStrategy: "new-event-key",
   calendarBackend: "system",
+  contentSearch: false,
+  bulkEdit: false,
   theme: "system",
   readSelection: false,
   setupComplete: false,

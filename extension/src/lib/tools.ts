@@ -202,6 +202,101 @@ export const NOTION_API_TOOLS: ToolDefinition[] = [
   },
 ];
 
+/**
+ * Finds pages by what is written in them, not just what they are called.
+ *
+ * Notion's own /search endpoint matches titles. That is fine for "open my Roadmap" and useless
+ * for "what did I decide about the budget" — the page is called Q3 Planning and nothing about it
+ * says budget. Off by default because answering one question costs a read of every candidate page.
+ */
+export const CONTENT_SEARCH_TOOLS: ToolDefinition[] = [
+  {
+    name: "search_page_contents",
+    description:
+      "Search the TEXT INSIDE the user's Notion pages, not just their titles. Use this whenever the user asks about something they wrote but does not name the page — \"what did I decide about pricing\", \"where did I write about the trip\" — and when search_notion returns nothing useful. Returns each match with the page id, title, url and the lines that matched, so you can quote them or read the page in full. Slower than search_notion because it reads pages, so prefer search_notion when the user names a page.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Words to look for in the page text. Several words match pages containing more of them." },
+        limit: { type: "number", description: "How many matching pages to return. Default 5, maximum 10." },
+        scan: { type: "number", description: "How many recently edited pages to read while searching. Default 25, maximum 60. Raise it if an older page is being missed." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+];
+
+/**
+ * Reading and writing many database rows at once, which is what filling a column across a table
+ * needs: "summarise every row into the Summary property", "tag these by topic".
+ *
+ * Notion AI does this with an always-on AI property. Oracle has no way to run on a schedule, so
+ * this is the on-demand equivalent — the model reads the rows, writes the values, and says what it
+ * changed. Off by default: one instruction can rewrite a whole table.
+ */
+export const BULK_EDIT_TOOLS: ToolDefinition[] = [
+  {
+    name: "read_database_rows",
+    description:
+      "Read rows from a database together with the text on each row's page. Use this before filling in a property across a table, so you are summarising or tagging what the row actually says rather than its title. Call get_database first for exact property names.",
+    input_schema: {
+      type: "object",
+      properties: {
+        database_id: { type: "string", description: "Database id or URL." },
+        limit: { type: "number", description: "How many rows to read. Default 20, maximum 50." },
+        include_content: { type: "boolean", description: "Include each row's page text. Default true. Set false when the properties are enough." },
+        only_empty_property: { type: "string", description: "Return only rows whose named property is empty, so a second pass does not redo finished rows." },
+      },
+      required: ["database_id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_database_rows",
+    description:
+      "Write one property on many rows in a single call, after reading them with read_database_rows. Each update names a page id and the value for that row. Tell the user how many rows you changed and what you wrote. Ask first if you are about to overwrite rows that already have a value.",
+    input_schema: {
+      type: "object",
+      properties: {
+        database_id: { type: "string", description: "The database the rows belong to, for resolving the property's type." },
+        property: { type: "string", description: "Name of the property to set, exactly as get_database reports it." },
+        updates: {
+          type: "array",
+          description: "One entry per row.",
+          items: {
+            type: "object",
+            properties: {
+              page_id: { type: "string", description: "Row page id, from read_database_rows." },
+              value: { type: "string", description: "Value for this row. Coerced to the property's real type." },
+            },
+            required: ["page_id", "value"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["database_id", "property", "updates"],
+      additionalProperties: false,
+    },
+  },
+];
+
+/** The optional tool groups, by the setting that turns each one on. */
+export const OPTIONAL_TOOL_GROUPS = {
+  contentSearch: CONTENT_SEARCH_TOOLS,
+  bulkEdit: BULK_EDIT_TOOLS,
+} as const;
+
+export type OptionalToolGroup = keyof typeof OPTIONAL_TOOL_GROUPS;
+
+/** The Notion tools for a given set of enabled options. */
+export function notionTools(enabled: Partial<Record<OptionalToolGroup, boolean>> = {}): ToolDefinition[] {
+  const extra = (Object.keys(OPTIONAL_TOOL_GROUPS) as OptionalToolGroup[])
+    .filter((key) => enabled[key])
+    .flatMap((key) => OPTIONAL_TOOL_GROUPS[key]);
+  return [...NOTION_API_TOOLS, ...extra];
+}
+
 export const ALL_TOOLS: ToolDefinition[] = [...PAGE_TOOLS, ...NOTION_API_TOOLS];
 
 /** Normalises a search result into the shape the model sees. */
@@ -429,6 +524,65 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const appended = await notion.appendMarkdown(id, String(input.content_markdown ?? ""));
           if (appended.length) record({ kind: "block", action: "create", label: `Appended ${appended.length} block${appended.length === 1 ? "" : "s"}`, target: id, undo: { type: "delete-blocks", blockIds: appended } });
           return ok({ appended_blocks: appended.length, page_id: id });
+        }
+
+        case "search_page_contents": {
+          const notion = requireNotion();
+          const query = String(input.query ?? "").trim();
+          if (!query) return fail("Give some words to search for.");
+          const scanned = Math.min(Math.max(Number(input.scan ?? 25), 1), 60);
+          const matches = await notion.searchPageContents(query, Number(input.limit ?? 5), scanned);
+          if (!matches.length) {
+            // Say how far it looked, so "nothing found" is actionable rather than final.
+            return ok(`No page among the ${scanned} most recently edited mentions ${JSON.stringify(query)}. Try different words, raise "scan" to look further back, or check the page is shared with the Oracle integration.`);
+          }
+          return ok({ matches, scanned, note: "Excerpts are the lines that matched. Call get_page or read_page_blocks for the full page." });
+        }
+
+        case "read_database_rows": {
+          const notion = requireNotion();
+          const resolved = await notion.resolveDataSource(String(input.database_id));
+          const rows = await notion.readDatabaseRows(resolved.dataSourceId, {
+            limit: Number(input.limit ?? 20),
+            includeContent: input.include_content !== false,
+            onlyEmpty: typeof input.only_empty_property === "string" ? input.only_empty_property : undefined,
+          });
+          return ok({
+            database: resolved.title,
+            properties: Object.fromEntries(Object.entries(resolved.properties).map(([k, v]) => [k, v.type])),
+            rows: rows.map((r) => ({ page_id: r.id, title: r.title, url: r.url, properties: summarizeProperties(r.properties), content: r.content })),
+          });
+        }
+
+        case "set_database_rows": {
+          const notion = requireNotion();
+          const property = String(input.property ?? "");
+          const updates = Array.isArray(input.updates) ? (input.updates as Array<{ page_id?: unknown; value?: unknown }>) : [];
+          if (!property) return fail("Name the property to set.");
+          if (!updates.length) return fail("No rows were given to update.");
+          const resolved = await notion.resolveDataSource(String(input.database_id));
+          if (!(property in resolved.properties)) {
+            return fail(`"${property}" is not a property of ${resolved.title}. It has: ${Object.keys(resolved.properties).join(", ")}`);
+          }
+
+          const done: string[] = [];
+          const failed: Array<{ page_id: string; error: string }> = [];
+          for (const update of updates) {
+            const pageId = String(update.page_id ?? "");
+            try {
+              const page = await notion.getPage(pageId);
+              const before = property in page.properties ? { [property]: page.properties[property] } : {};
+              await notion.updatePage(pageId, coerceProperties(resolved.properties, { [property]: update.value }));
+              // Recorded per row, so undoing one mistaken value does not revert the whole pass.
+              record({ kind: "page", action: "update", label: `Set ${property} on "${pageTitle(page)}"`, target: pageId, url: page.url, undo: { type: "restore-page-properties", pageId, properties: before } });
+              done.push(pageId);
+            } catch (error) {
+              // One bad row must not abandon the rest half-written.
+              failed.push({ page_id: pageId, error: error instanceof Error ? error.message : String(error) });
+            }
+          }
+          if (!done.length) return fail(`No rows could be updated. First error: ${failed[0]?.error ?? "unknown"}`);
+          return ok({ updated: done.length, property, failed: failed.length ? failed : undefined });
         }
 
         default:

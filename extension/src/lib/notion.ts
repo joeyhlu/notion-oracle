@@ -67,6 +67,68 @@ export interface NotionDataSource {
 }
 
 /** A database plus the data source that schema and row operations should target. */
+export interface ContentMatch {
+  id: string;
+  title: string;
+  url: string;
+  /** How many of the search terms appear at all — the primary ranking signal. */
+  termsMatched: number;
+  /** Total occurrences across all terms. */
+  hits: number;
+  /** The lines that matched, so an answer can quote the page rather than paraphrase it. */
+  excerpts: string[];
+}
+
+export interface DatabaseRow {
+  id: string;
+  url: string;
+  title: string;
+  properties: NotionPage["properties"];
+  content?: string;
+}
+
+/**
+ * Scores one page's text against the search terms, and pulls out the lines that matched.
+ *
+ * The title counts too: a page called "Budget" is a match for "budget" even when the body never
+ * repeats the word.
+ */
+export function scoreText(text: string, title: string, terms: string[]): { termsMatched: number; hits: number; excerpts: string[] } | null {
+  const haystack = `${title}\n${text}`.toLowerCase();
+  let termsMatched = 0;
+  let hits = 0;
+  for (const term of terms) {
+    const found = haystack.split(term).length - 1;
+    if (found) {
+      termsMatched++;
+      hits += found;
+    }
+  }
+  if (!termsMatched) return null;
+
+  const excerpts: string[] = [];
+  for (const line of text.split("\n")) {
+    const lower = line.toLowerCase();
+    if (!terms.some((t) => lower.includes(t))) continue;
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    excerpts.push(trimmed.length > 240 ? `${trimmed.slice(0, 240)}…` : trimmed);
+    if (excerpts.length === 3) break;
+  }
+  return { termsMatched, hits, excerpts };
+}
+
+/** True when a property holds nothing, so a fill pass can skip rows that are already done. */
+export function isEmptyProperty(property: Record<string, unknown> | undefined): boolean {
+  if (!property) return true;
+  const value = property[String(property.type)];
+  if (value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "string") return value.trim() === "";
+  if (typeof value === "object") return Object.keys(value as object).length === 0;
+  return false;
+}
+
 export interface ReplaceResult {
   /** True when the block's type changed, which means the original id no longer exists. */
   converted: boolean;
@@ -352,6 +414,62 @@ export class NotionClient {
   /** Writes a raw block body back, bypassing the type check replaceBlock does. */
   restoreBlock(blockId: string, body: Record<string, unknown>): Promise<FetchedBlock> {
     return this.request("PATCH", `/blocks/${normalizeId(blockId)}`, body);
+  }
+
+  /**
+   * Finds pages by the words inside them.
+   *
+   * Notion has no content-search endpoint, so this reads candidate pages and scores them locally.
+   * Candidates are the most recently edited pages, which is the ordering /search already returns
+   * and a good proxy for "the thing I was just working on". Reads run in small batches: a burst of
+   * sixty parallel requests trips Notion's rate limiter, and a strictly serial scan is slow enough
+   * that the model gives up on it.
+   */
+  async searchPageContents(query: string, limit = 5, scan = 25): Promise<ContentMatch[]> {
+    const terms = query.toLowerCase().split(/\s+/).map((t) => t.replace(/[^\w'-]/g, "")).filter((t) => t.length > 1);
+    if (!terms.length) return [];
+
+    const candidates = (await this.search("", "page", Math.min(Math.max(scan, 1), 60))) as NotionPage[];
+    const matches: ContentMatch[] = [];
+    const BATCH = 5;
+    for (let i = 0; i < candidates.length; i += BATCH) {
+      const slice = candidates.slice(i, i + BATCH);
+      const read = await Promise.all(slice.map(async (page) => {
+        try {
+          return { page, text: await this.getPageMarkdown(page.id) };
+        } catch {
+          // One unreadable page must not sink the search.
+          return null;
+        }
+      }));
+      for (const item of read) {
+        if (!item) continue;
+        const scored = scoreText(item.text, pageTitle(item.page), terms);
+        if (scored) matches.push({ id: item.page.id, title: pageTitle(item.page), url: item.page.url, ...scored });
+      }
+    }
+    // Most terms matched first, then most occurrences: a page mentioning every word beats one
+    // that repeats a single word.
+    matches.sort((a, b) => b.termsMatched - a.termsMatched || b.hits - a.hits);
+    return matches.slice(0, Math.min(Math.max(limit, 1), 10));
+  }
+
+  /** Rows of a database with their page text, for filling a property across a table. */
+  async readDatabaseRows(dataSourceId: string, options: { limit?: number; includeContent?: boolean; onlyEmpty?: string } = {}): Promise<DatabaseRow[]> {
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, { page_size: limit });
+    const rows: DatabaseRow[] = [];
+    for (const page of res.results) {
+      if (options.onlyEmpty && !isEmptyProperty(page.properties?.[options.onlyEmpty])) continue;
+      rows.push({
+        id: page.id,
+        url: page.url,
+        title: pageTitle(page),
+        properties: page.properties,
+        content: options.includeContent === false ? undefined : await this.getPageMarkdown(page.id).catch(() => ""),
+      });
+    }
+    return rows;
   }
 
   updatePage(pageId: string, properties: Record<string, unknown>): Promise<NotionPage> {

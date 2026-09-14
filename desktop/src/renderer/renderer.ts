@@ -293,6 +293,8 @@ async function loadSetupForm(): Promise<void> {
   void refreshSetupStatus();
   $<HTMLInputElement>("follow-notion").checked = settings.followNotion;
   $<HTMLInputElement>("read-selection").checked = settings.readSelection;
+  $<HTMLInputElement>("content-search").checked = settings.contentSearch;
+  $<HTMLInputElement>("bulk-edit").checked = settings.bulkEdit;
   $<HTMLInputElement>("calendar-automation").checked = settings.calendarAutomation;
   $<HTMLInputElement>("calendar-autosave").checked = settings.calendarAutoSave;
   $<HTMLSelectElement>("calendar-strategy").value = settings.calendarStrategy;
@@ -329,6 +331,8 @@ async function saveSetup(): Promise<void> {
     hotkey: $<HTMLInputElement>("hotkey").value.trim() || "CommandOrControl+Shift+Space",
     followNotion: $<HTMLInputElement>("follow-notion").checked,
     readSelection: $<HTMLInputElement>("read-selection").checked,
+    contentSearch: $<HTMLInputElement>("content-search").checked,
+    bulkEdit: $<HTMLInputElement>("bulk-edit").checked,
     calendarAutomation: $<HTMLInputElement>("calendar-automation").checked,
     calendarAutoSave: $<HTMLInputElement>("calendar-autosave").checked,
     calendarStrategy: $<HTMLSelectElement>("calendar-strategy").value === "command-bar" ? "command-bar" : "new-event-key",
@@ -590,6 +594,9 @@ function setBadge(id: string, state: "ok" | "warn" | "optional" | "pending", not
 async function refreshSetupStatus(): Promise<void> {
   const notionReady = Boolean(settings.notionToken.trim());
   setBadge("notion", notionReady ? "ok" : "warn", notionReady ? "Connected" : "Needed to read your pages");
+
+  const power = [settings.contentSearch && "deep search", settings.bulkEdit && "bulk edits"].filter(Boolean) as string[];
+  setBadge("power", power.length ? "ok" : "optional", power.length ? power.join(" · ") : "Off");
 
   if (!settings.calendarAutomation) setBadge("calendar", "optional", "Turned off");
   else if (settings.calendarBackend === "system" && (platform === "darwin" || platform === "win32")) setBadge("calendar", "ok", platform === "win32" ? "Outlook" : "macOS Calendar");

@@ -5,6 +5,7 @@ An AI assistant for Notion that runs on **your own Claude or ChatGPT subscriptio
 Ask it things in plain language and it does them in Notion for real — no copy-paste:
 
 > *"Summarize the page I'm looking at."*
+> *"What did I decide about the budget?"*
 > *"Turn this into a to-do list and add it to the end."*
 > *"Fix the formula in the third block."*
 > *"Put 'Dentist' on my calendar Thursday at 2."*
@@ -32,7 +33,8 @@ Two ways to run it:
    Oracle detects the tool, shows whether you're signed in, and its **Sign in** button opens a terminal running the login (`claude auth login` or `codex login`) for you.
 3. **Connect Notion:** create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations), paste its secret into Oracle, and **share your pages with it** (**••• → Connections** in Notion). Sharing a top-level page shares everything underneath it. *This is the step people miss* — without it Oracle can authenticate but sees an empty workspace.
 4. **Optional — connect your calendar**: on a Mac, add your Google, iCloud or Outlook account in **System Settings → Internet Accounts**; on Windows, Oracle uses Outlook, so any account added there works. Then turn on the calendar step in Oracle's setup. The OS asks you to approve access the first time.
-5. Press **⌘⇧Space** (**Ctrl⇧Space** on Windows) or click the ◎ pill to talk to Oracle.
+5. **Optional — turn on deeper search or bulk edits** in setup, if you want Oracle to search inside your pages or fill a database column. See below for what each costs.
+6. Press **⌘⇧Space** (**Ctrl⇧Space** on Windows) or click the ◎ pill to talk to Oracle.
 
 Setup is four steps with live status badges — green when done, red when it's blocking, dash when optional — so you can see at a glance what's left.
 
@@ -48,12 +50,23 @@ See [`desktop/README.md`](desktop/README.md) for how it works internally and tro
 | Read a page | `read_page_blocks` — returns block IDs, which is what makes editing in place possible |
 | Write | `create_page`, `create_database_entry`, `update_page`, `append_to_page` |
 | Edit in place | `update_block`, `insert_after_block`, `delete_block` — it rewrites the block you meant instead of appending a corrected copy at the bottom |
+| Optional | `search_page_contents`, `read_database_rows`, `set_database_rows` — off by default, see below |
 
 Oracle also knows which page you have open in the Notion app, so "this page" means what you're looking at — and on macOS it can see the text you have **highlighted**, so "fix this paragraph" works without describing which one. That needs the Accessibility permission and can be switched off in Preferences.
 
 **Undo.** Everything Oracle changes is recorded, and the **⟲** button in the header lists it with an Undo on each entry: blocks it added are removed, a rewritten block gets its previous text back, a deleted one comes out of Notion's trash, and calendar events are put back as they were. A line under each reply says what that turn actually touched — taken from the record of what the tools did, not from the model's own account of it.
 
 **Conversations are kept.** Quitting no longer ends the thread. The **☰** button lists past conversations, and reopening one restores both the transcript and the underlying CLI session, so the next message carries on rather than starting fresh.
+
+### Two things you can turn on
+
+Both live in **Setup → Deeper search & bulk edits**, and both are off until you ask for them: each costs noticeably more time and more of your AI subscription per question than the defaults.
+
+**Search inside your pages, not just their titles.** Notion's own search matches titles, which is fine for "open my Roadmap" and useless for *"what did I decide about the budget"* when the page is called Q3 Planning. With this on, Oracle reads your recently edited pages, ranks them by how many of your words they actually contain, and answers with the lines that matched and a link to each page. It says how far back it looked when it finds nothing, so you can tell "not written down" from "further back than I checked".
+
+**Fill a property across a whole database.** *"Summarize every row into the Summary column"*, *"tag these by topic"*. Oracle reads each row's page — not just its title — then writes the whole column in one pass. It can skip rows that already have a value, so topping up a column doesn't redo finished work, and every row it writes is recorded separately, so one wrong value can be undone on its own without reverting the pass.
+
+This is the on-demand version of Notion AI's always-on AI properties. Oracle has no way to run on a schedule, so it fills the column when you ask rather than as rows change.
 
 **In your calendar** — Calendar.app on macOS, Outlook on Windows, so events sync to your phone and to Notion Calendar like any other:
 

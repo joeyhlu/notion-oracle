@@ -29,7 +29,8 @@ function installBridge(ready) {
     notionToken: ready ? "ntn_smoke" : "",
     customInstructions: "", hotkey: "CommandOrControl+Shift+Space", followNotion: true,
     calendarAutomation: true, calendarBackend: "system", calendarAutosave: false,
-    calendarStrategy: "new-event-key", setupComplete: ready,
+    calendarStrategy: "new-event-key", setupComplete: ready, readSelection: false,
+    contentSearch: false, bulkEdit: false,
   };
   window.oracle = {
     platform: async () => "darwin",
@@ -161,6 +162,12 @@ for (const ready of [true, false]) {
   // Setup opens the step that still needs attention rather than everything or nothing.
   check(`${state}: open steps`, await page.evaluate(
     () => [...document.querySelectorAll(".step.open")].map((s) => s.id)), ready ? [] : ["step-ai"]);
+  // The two opt-in capabilities are offered, and read as off until asked for.
+  check(`${state}: extras offered and off`, await page.evaluate(() => {
+    document.getElementById("step-power").classList.add("open");
+    return ["content-search", "bulk-edit"].map((id) => document.getElementById(id)?.checked);
+  }), [false, false]);
+  check(`${state}: extras summarised on the step`, await page.locator("#note-power").innerText(), "Off");
   await shot("setup");
 
   await page.click("#btn-help");

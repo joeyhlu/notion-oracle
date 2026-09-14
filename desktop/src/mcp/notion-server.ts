@@ -4,7 +4,7 @@
  */
 
 import { NotionClient } from "../../../extension/src/lib/notion.ts";
-import { NOTION_API_TOOLS, createToolExecutor } from "../../../extension/src/lib/tools.ts";
+import { createToolExecutor, notionTools } from "../../../extension/src/lib/tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
 import { appendChange } from "../shared/journal-file.ts";
 import type { UndoStep } from "../shared/journal.ts";
@@ -21,7 +21,12 @@ export const server = new StdioMcpServer({
   instructions: notion
     ? "Tools for reading and writing the user's Notion workspace. Call get_database before creating or updating database entries, and read_page_blocks before editing existing content."
     : "No Notion token is configured; every tool will fail until the user adds one in Notion Oracle settings.",
-  tools: NOTION_API_TOOLS,
+  // Which optional groups are on is decided by the main process and arrives as environment flags,
+  // the same way the journal path and the Notion token do.
+  tools: notionTools({
+    contentSearch: process.env.ORACLE_CONTENT_SEARCH === "1",
+    bulkEdit: process.env.ORACLE_BULK_EDIT === "1",
+  }),
   execute: createToolExecutor({
     notion,
     currentPageId: process.env.NOTION_CURRENT_PAGE_ID || null,

@@ -4,7 +4,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen,
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { NotionClient } from "../../../extension/src/lib/notion.ts";
-import { NOTION_API_TOOLS } from "../../../extension/src/lib/tools.ts";
+import { notionTools } from "../../../extension/src/lib/tools.ts";
 import { CALENDAR_TOOL_NAMES } from "../mcp/calendar-tools.ts";
 import { DEFAULT_SETTINGS, type BrainId, type ChatEvent, type ChatRequest, type OverlayMode, type Settings } from "../shared/types.ts";
 import { ClaudeBrain } from "./brains/claude.ts";
@@ -200,8 +200,15 @@ function mcpSpecs(current: Settings): McpServerSpec[] {
       name: "notion",
       command: process.execPath,
       args: [serverScriptPath("notion-server.js")],
-      env: { ...NODE_ENV, NOTION_TOKEN: current.notionToken, ORACLE_JOURNAL: journalPath() },
-      toolNames: NOTION_API_TOOLS.map((t) => t.name),
+      env: {
+        ...NODE_ENV,
+        NOTION_TOKEN: current.notionToken,
+        ORACLE_JOURNAL: journalPath(),
+        ORACLE_CONTENT_SEARCH: current.contentSearch ? "1" : "0",
+        ORACLE_BULK_EDIT: current.bulkEdit ? "1" : "0",
+      },
+      // The allow-list must match what the server exposes, or an enabled tool is never callable.
+      toolNames: notionTools({ contentSearch: current.contentSearch, bulkEdit: current.bulkEdit }).map((t) => t.name),
     },
   ];
   if (current.calendarAutomation && (process.platform === "darwin" || process.platform === "win32")) {
@@ -292,7 +299,7 @@ async function runChat(request: ChatRequest): Promise<void> {
     await brain.run({
       cliPath,
       prompt: buildUserTurn(request.text, hint),
-      systemPrompt: buildSystemPrompt(current.customInstructions, { calendar: current.calendarAutomation, calendarAutoSave: current.calendarAutoSave }),
+      systemPrompt: buildSystemPrompt(current.customInstructions, { calendar: current.calendarAutomation, calendarAutoSave: current.calendarAutoSave, contentSearch: current.contentSearch, bulkEdit: current.bulkEdit }),
       threadId: request.threadId,
       mcpServers: mcpSpecs(current),
       model: current.model,
