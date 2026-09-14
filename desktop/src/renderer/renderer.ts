@@ -45,30 +45,46 @@ function showView(view: View): void {
   if (view === "changes") void renderChanges();
   if (view === "history") void renderHistory();
   if (view === "setup") void loadSetupForm();
-  else if (view === "chat") setTimeout(() => $("input").focus(), 50);
+  else if (view === "chat") {
+    // Re-read on the way back in: the user may have just granted the permission in setup, or
+    // switched to a different Notion page while the panel was on another screen.
+    void refreshLookingAt();
+    setTimeout(() => $("input").focus(), 50);
+  }
 }
 
 async function refreshLookingAt(): Promise<void> {
-  const el = $("looking-at");
+  const line = $("looking-at");
   try {
     const hint = await window.oracle.getPageHint();
-    if (!hint.notionWindowTitle && !hint.selection) {
-      el.hidden = true;
+    const blocked = hint.windowStatus === "no-permission";
+    if (!hint.notionWindowTitle && !hint.selection && !blocked) {
+      line.hidden = true;
       return;
     }
-    el.hidden = false;
-    el.replaceChildren();
+    line.hidden = false;
+    line.replaceChildren();
     if (hint.notionWindowTitle) {
-      el.append("Looking at ", el2("strong", hint.notionWindowTitle));
+      line.append("Looking at ", el2("strong", hint.notionWindowTitle));
+    } else if (blocked) {
+      // Notion is open and Oracle cannot read the title. Say so here rather than leaving the user
+      // to discover it from a reply claiming Notion is not running.
+      line.append(el2("span", "Can\u2019t read the open page \u2014 ", "warn"));
+      const fix = el("button", "link-btn", "how to fix") as HTMLButtonElement;
+      fix.addEventListener("click", () => {
+        showView("help");
+        openFaq("window-permission");
+      });
+      line.appendChild(fix);
     }
     // Say so when a selection is in play: the user should know what Oracle can see before
     // sending, not discover it from the answer.
     if (hint.selection) {
-      if (hint.notionWindowTitle) el.append(" · ");
-      el.append(el2("span", `${countWords(hint.selection)} selected`, "selected"));
+      if (hint.notionWindowTitle) line.append(" · ");
+      line.append(el2("span", `${countWords(hint.selection)} selected`, "selected"));
     }
   } catch {
-    el.hidden = true;
+    line.hidden = true;
   }
 }
 
@@ -328,7 +344,8 @@ async function saveSetup(): Promise<void> {
 
 
 /** Answers to what actually goes wrong, in the order people hit it. */
-const FAQ: Array<{ q: string; a: string }> = [
+/** `id` lets a link elsewhere in the app open one entry without matching on its wording. */
+const FAQ: Array<{ q: string; a: string; id?: string }> = [
   {
     q: "Nothing happens when I click the ◎ button",
     a: "<p>Press <strong>⌘⇧Space</strong> (Ctrl⇧Space on Windows) or click the ◎ icon in your menu bar — both open this panel and neither depends on the button.</p><p>If the button itself is dead on an older build, updating fixes it.</p>",
@@ -358,6 +375,12 @@ const FAQ: Array<{ q: string; a: string }> = [
     a: "<p>Open <strong>System Settings → Privacy &amp; Security → Automation</strong>, find Notion Oracle, and allow it to control <strong>Calendar</strong>.</p><p>If it also asks about Calendars access, choose <strong>Full Access</strong> — “Add Only” blocks reading and deleting.</p><p>This can reappear after an app update, because macOS ties the permission to each build.</p>",
   },
   {
+    id: "window-permission",
+    q: "Oracle says it can\u2019t see the page I have open",
+    a: "<p>Reading the Notion window\u2019s title needs the macOS <strong>Automation</strong> permission, which is a different grant from the one that makes the \u25ce button appear \u2014 so the button can work perfectly while this does not.</p><p>Open <strong>System Settings \u2192 Privacy &amp; Security \u2192 Automation</strong>, find <strong>Notion Oracle</strong>, and switch on <strong>Notion</strong> (and <strong>System Events</strong> if it is listed). Then quit Oracle and reopen it \u2014 a running app keeps the answer it was given at launch.</p><p>If Notion Oracle is not listed at all, macOS has not asked yet: send Oracle a message mentioning \u201cthis page\u201d and the prompt should appear.</p><p>Until then Oracle still works \u2014 name the page in your message, or let it list your recently edited pages and pick one.</p>",
+  },
+  {
+    id: "selection-permission",
     q: "Oracle cannot see what I have highlighted",
     a: "<p>Reading your selection needs the macOS <strong>Accessibility</strong> permission, which is a different one from the calendar and automation prompts. Open <strong>System Settings → Privacy &amp; Security → Accessibility</strong> and switch on <strong>Notion Oracle</strong>, then quit and reopen it.</p><p>When it is working, the line above the message box says how many words are selected. If you would rather Oracle never read it, turn off <strong>Use the text I have highlighted in Notion</strong> in Setup → Preferences; everything else keeps working.</p>",
   },
@@ -380,6 +403,7 @@ function renderFaq(): void {
   host.replaceChildren();
   for (const entry of FAQ) {
     const item = el("div", "faq-item");
+    if (entry.id) item.dataset.faq = entry.id;
     const q = el("button", "faq-q") as HTMLButtonElement;
     q.append(document.createTextNode(entry.q), el("span", "chev", "\u203a"));
     const a = el("div", "faq-a");
@@ -532,6 +556,15 @@ function changeRow(change: Change): HTMLElement {
 }
 
 /** Opens one setup step and closes the others, so the screen never becomes a wall of forms. */
+/** Opens one FAQ entry by id and scrolls to it. Matching on wording would break on a reword. */
+function openFaq(id: string): void {
+  for (const item of document.querySelectorAll<HTMLElement>("#faq .faq-item")) {
+    const match = item.dataset.faq === id;
+    item.classList.toggle("open", match);
+    if (match) item.scrollIntoView({ block: "start" });
+  }
+}
+
 function openStep(name: string): void {
   for (const step of document.querySelectorAll<HTMLElement>(".step")) {
     step.classList.toggle("open", step.id === `step-${name}`);

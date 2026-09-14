@@ -40,7 +40,7 @@ function installBridge(ready) {
       version: ready ? "2.1.0" : null, loggedIn: ready,
       detail: ready ? "signed in" : "not found on this machine",
     }),
-    getPageHint: async () => null,
+    getPageHint: async () => window.__hint ?? null,
     testNotion: async () => ({ ok: true, message: "Connected" }),
     chatSend: async () => {}, chatAbort: async () => {},
     getChanges: async () => window.__changes ?? [],
@@ -209,6 +209,18 @@ for (const ready of [true, false]) {
   check(`${state}: transcript is redrawn`, await page.locator("#messages .msg").count(), 2);
   // Markdown is re-rendered, not shown as source.
   check(`${state}: reply keeps its formatting`, await page.locator("#messages .msg.assistant strong").innerText(), "Three");
+
+  // A blocked window read has to be visible in the panel, not only in a reply.
+  await page.evaluate(() => { window.__hint = { notionWindowTitle: null, windowStatus: "no-permission" }; });
+  await page.click("#btn-history");
+  await page.click("#btn-history");
+  await page.waitForFunction(() => !document.getElementById("looking-at").hidden);
+  check(`${state}: blocked read is shown`, await page.locator("#looking-at .warn").innerText(), "Can’t read the open page — ");
+  await page.locator("#looking-at .link-btn").click();
+  check(`${state}: it opens the right FAQ entry`, await page.evaluate(
+    () => [...document.querySelectorAll("#faq .faq-item.open")].map((i) => i.dataset.faq)),
+    ["window-permission"]);
+  await page.evaluate(() => { window.__hint = null; });
 
   check(`${state}: console clean`, noise, []);
   await page.close();

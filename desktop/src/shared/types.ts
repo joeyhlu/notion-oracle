@@ -103,6 +103,8 @@ export interface ChatRequest {
 export interface PageHint {
   /** Title of the Notion window in front, if the Notion desktop app is running. */
   notionWindowTitle: string | null;
+  /** Why the title is missing, so the model can say what to fix rather than "I can't see it". */
+  windowStatus?: "ok" | "not-running" | "no-permission" | "no-title";
   /** Text highlighted in the Notion app, when macOS accessibility permission allows reading it. */
   selection?: string | null;
 }

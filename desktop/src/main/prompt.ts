@@ -20,12 +20,31 @@ export function buildSystemPrompt(customInstructions: string, features: { calend
   return parts.join("\n");
 }
 
+/**
+ * How to describe the open page, including what to tell the user when it could not be read.
+ *
+ * A denied Automation permission used to look identical to Notion not running, so Oracle
+ * announced "Notion isn't showing up on my end" to someone staring at an open Notion window and
+ * gave them nothing to act on.
+ */
+export function describeWindow(hint: PageHint): string {
+  if (hint.notionWindowTitle) return JSON.stringify(hint.notionWindowTitle);
+  switch (hint.windowStatus) {
+    case "no-permission":
+      return "(Notion IS open, but macOS has not allowed Oracle to read its window title. Do not tell the user Notion is closed or undetected. Tell them to open System Settings → Privacy & Security → Automation, expand Notion Oracle and switch on Notion, then reopen Oracle. Meanwhile ask which page they mean, or offer the most recently edited ones.)";
+    case "no-title":
+      return "(Notion is open but its window has no page title — probably a blank or new window. Ask which page they mean.)";
+    default:
+      return "(The Notion desktop app does not appear to be running; ask the user which page they mean if it matters.)";
+  }
+}
+
 export function buildUserTurn(text: string, hint: PageHint): string {
   const now = new Date();
   const lines = [
     `<context>`,
     `Now: ${now.toISOString()} (${now.toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}, timezone ${Intl.DateTimeFormat().resolvedOptions().timeZone})`,
-    `Notion window in front: ${hint.notionWindowTitle ? JSON.stringify(hint.notionWindowTitle) : "(Notion app not detected; ask the user which page they mean if it matters)"}`,
+    `Notion window in front: ${describeWindow(hint)}`,
   ];
   // Fenced rather than quoted: a selection can contain any characters, and the model has to be
   // able to tell where the user's own words end and the highlighted text begins.

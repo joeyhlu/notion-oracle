@@ -445,3 +445,4 @@ body.collapsed .panel { display: none; }
   text-decoration: underline; text-underline-offset: 2px;
 }
 .looking-at .selected { color: var(--accent); }
+.looking-at .warn { color: var(--bad); }
