@@ -17,7 +17,7 @@ Two ways to run it:
 | Runs | Floating overlay next to the Notion desktop app, Mac / Windows / Linux | Side panel inside notion.so in Chrome |
 | AI account | Your **Claude Pro/Max** sign-in (via Claude Code) or **ChatGPT Plus/Pro** sign-in (via Codex CLI) — no API key | Anthropic or OpenAI **API key** (pay per use) |
 | Notion access | Whole workspace through a Notion integration; edits appear in the app instantly | The open page (DOM), plus the workspace with an integration token |
-| Calendar | Real calendar events on macOS (Google / iCloud / Outlook via Calendar.app) | Notion databases with a date property |
+| Calendar | Real events: Calendar.app on macOS, Outlook on Windows | Notion databases with a date property |
 | Best for | "Just add AI to my Notion" | Editing text in place on the page you're reading |
 
 ## Desktop app — quick start
@@ -31,7 +31,7 @@ Two ways to run it:
 
    Oracle detects the tool, shows whether you're signed in, and its **Sign in** button opens a terminal running the login (`claude auth login` or `codex login`) for you.
 3. **Connect Notion:** create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations), paste its secret into Oracle, and **share your pages with it** (**••• → Connections** in Notion). Sharing a top-level page shares everything underneath it. *This is the step people miss* — without it Oracle can authenticate but sees an empty workspace.
-4. **Optional — connect your calendar** (macOS): add your Google, iCloud or Outlook account in **System Settings → Internet Accounts**, then turn on the calendar step in Oracle's setup. macOS will ask you to approve access the first time.
+4. **Optional — connect your calendar**: on a Mac, add your Google, iCloud or Outlook account in **System Settings → Internet Accounts**; on Windows, Oracle uses Outlook, so any account added there works. Then turn on the calendar step in Oracle's setup. The OS asks you to approve access the first time.
 5. Press **⌘⇧Space** (**Ctrl⇧Space** on Windows) or click the ◎ pill to talk to Oracle.
 
 Setup is four steps with live status badges — green when done, red when it's blocking, dash when optional — so you can see at a glance what's left.
@@ -49,15 +49,19 @@ See [`desktop/README.md`](desktop/README.md) for how it works internally and tro
 | Write | `create_page`, `create_database_entry`, `update_page`, `append_to_page` |
 | Edit in place | `update_block`, `insert_after_block`, `delete_block` — it rewrites the block you meant instead of appending a corrected copy at the bottom |
 
-Oracle also knows which page you have open in the Notion app, so "this page" means what you're looking at.
+Oracle also knows which page you have open in the Notion app, so "this page" means what you're looking at — and on macOS it can see the text you have **highlighted**, so "fix this paragraph" works without describing which one. That needs the Accessibility permission and can be switched off in Preferences.
 
-**In your calendar** (macOS, through Calendar.app — so events sync to your phone and to Notion Calendar like any other):
+**Undo.** Everything Oracle changes is recorded, and the **⟲** button in the header lists it with an Undo on each entry: blocks it added are removed, a rewritten block gets its previous text back, a deleted one comes out of Notion's trash, and calendar events are put back as they were. A line under each reply says what that turn actually touched — taken from the record of what the tools did, not from the model's own account of it.
+
+**Conversations are kept.** Quitting no longer ends the thread. The **☰** button lists past conversations, and reopening one restores both the transcript and the underlying CLI session, so the next message carries on rather than starting fresh.
+
+**In your calendar** — Calendar.app on macOS, Outlook on Windows, so events sync to your phone and to Notion Calendar like any other:
 
 `calendar_list_calendars`, `calendar_list_events`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_move_event`, `calendar_set_default_calendar`
 
 New events go to the calendar belonging to your account rather than the empty local one macOS lists first; you can pin a different default by asking ("use my Gmail calendar"), and move a misplaced event with `calendar_move_event`.
 
-On Windows and Linux, or if you'd rather drive Notion Calendar directly, Oracle falls back to opening Notion Calendar and typing the event — create-only, no reading or editing.
+On Windows any account you have added to Outlook works, Google and iCloud included. On Linux, on a PC without Outlook, or if you'd rather drive Notion Calendar directly, Oracle falls back to opening Notion Calendar and typing the event — create-only, no reading or editing.
 
 ## Browser extension — quick start
 
