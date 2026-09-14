@@ -9,8 +9,21 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path";
 import type { Change } from "./journal.ts";
 
-/** Keeps the file from growing without bound; the UI only ever shows the recent tail anyway. */
+/** The most entries kept. The UI only ever shows the recent tail anyway. */
 export const MAX_ENTRIES = 200;
+
+/**
+ * Trims the journal if it has grown past the cap.
+ *
+ * Appends deliberately do not trim — they are called from two concurrent child processes, and a
+ * rewrite there would race. Pruning is the main process's job, between runs, when nothing is
+ * appending. Without this the cap was decorative: rewriteChanges only ran on undo or clear, so a
+ * user who never undid anything grew the file forever.
+ */
+export function pruneChanges(file: string): void {
+  if (readChanges(file).length <= MAX_ENTRIES) return;
+  rewriteChanges(file, (c) => c);
+}
 
 export function newChangeId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

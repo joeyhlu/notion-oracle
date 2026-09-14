@@ -12,6 +12,12 @@ function tokens(body: string): Record<string, string> {
   return out;
 }
 
+test("reading the selection is off until asked for", () => {
+  // Reading it is what triggers the macOS Accessibility prompt, and that happens on every panel
+  // open — so defaulting it on would ask an upgrading user for control of their computer.
+  assert.equal(DEFAULT_SETTINGS.readSelection, false);
+});
+
 test("appearance defaults to following the OS", () => {
   assert.equal(DEFAULT_SETTINGS.theme, "system");
   assert.deepEqual([...THEMES], ["system", "light", "dark"]);

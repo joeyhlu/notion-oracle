@@ -73,8 +73,12 @@ export function listCalendarsScript(): string {
     preamble(),
     "$seen = @{}",
     "foreach ($store in $ns.Folders) {",
-    "  try { $cal = $store.Folders.Item('Calendar') } catch { $cal = $null }",
-    `  if ($null -eq $cal) { try { $cal = $ns.GetDefaultFolder(${OL_FOLDER_CALENDAR}) } catch { continue } }`,
+    // Store.GetDefaultFolder is locale-independent; the folder is called Kalender, Calendrier and
+    // so on, so looking it up by the English name finds nothing outside an English install. The
+    // name lookup stays as a fallback for stores that do not expose a Store object.
+    `  try { $cal = $store.Store.GetDefaultFolder(${OL_FOLDER_CALENDAR}) } catch { $cal = $null }`,
+    "  if ($null -eq $cal) { try { $cal = $store.Folders.Item('Calendar') } catch { $cal = $null } }",
+    "  if ($null -eq $cal) { continue }",
     "  $name = $store.Name",
     "  if ($seen.ContainsKey($name)) { continue }",
     "  $seen[$name] = $true",
@@ -91,7 +95,10 @@ function folderLookup(calendar?: string): string {
   return [
     "$folder = $null",
     "foreach ($store in $ns.Folders) {",
-    `  if ($store.Name -eq ${psLiteral(calendar)}) { try { $folder = $store.Folders.Item('Calendar') } catch { } }`,
+    `  if ($store.Name -eq ${psLiteral(calendar)}) {`,
+    `    try { $folder = $store.Store.GetDefaultFolder(${OL_FOLDER_CALENDAR}) } catch { }`,
+    "    if ($null -eq $folder) { try { $folder = $store.Folders.Item('Calendar') } catch { } }",
+    "  }",
     "}",
     `if ($null -eq $folder) { $folder = $ns.GetDefaultFolder(${OL_FOLDER_CALENDAR}) }`,
   ].join("\n");

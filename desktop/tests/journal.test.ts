@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appendFileSync, mkdtempSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_ENTRIES, appendChange, readChanges, rewriteChanges } from "../src/shared/journal-file.ts";
+import { MAX_ENTRIES, appendChange, pruneChanges, readChanges, rewriteChanges } from "../src/shared/journal-file.ts";
 import { summarise, type Change } from "../src/shared/journal.ts";
 
 const scratch = () => join(mkdtempSync(join(tmpdir(), "oracle-journal-")), "changes.jsonl");
@@ -83,9 +83,42 @@ test("summarise groups a turn's edits by page instead of counting them one by on
   assert.equal(line, "Changed 3 edits across 2 pages and 1 calendar event");
 });
 
+test("summarise does not invent a page count it does not have", () => {
+  // delete_block needs only a block id, so nothing looks up which page it was on. Bucketing
+  // those under one empty target used to report three pages as one, and one page as two — in a
+  // line whose whole purpose is being more trustworthy than the model's own account.
+  const base = { id: "x", at: "", tool: "notion", action: "delete", kind: "block", label: "" } as const;
+  assert.equal(summarise([{ ...base }, { ...base }]), "Changed 2 edits");
+  assert.equal(
+    summarise([{ ...base, target: "page-1" }, { ...base }]),
+    "Changed 2 edits across 1 page and elsewhere",
+  );
+});
+
 test("summarise ignores changes that were undone, and says nothing when there are none", () => {
   const base = { id: "x", at: "", tool: "notion", action: "create", kind: "block", label: "", target: "p" } as const;
   assert.equal(summarise([]), null);
   assert.equal(summarise([{ ...base, undone: true }]), null);
   assert.equal(summarise([{ ...base }]), "Changed 1 edit across 1 page");
+});
+
+test("the journal is pruned between runs, not only when something is undone", () => {
+  // rewriteChanges was the only trim, and it runs on undo or clear; a user who never undid
+  // anything grew the file forever.
+  const file = scratch();
+  for (let i = 0; i < MAX_ENTRIES + 25; i++) appendChange(file, entry({ label: `n${i}` }));
+  assert.equal(readChanges(file).length, MAX_ENTRIES + 25, "appends do not trim, by design");
+  pruneChanges(file);
+  const kept = readChanges(file);
+  assert.equal(kept.length, MAX_ENTRIES);
+  assert.equal(kept[0]?.label, `n${MAX_ENTRIES + 24}`, "the oldest go, not the newest");
+});
+
+test("pruning an under-cap journal rewrites nothing", () => {
+  // The rewrite races with a concurrent append, so it must not happen when it is not needed.
+  const file = scratch();
+  appendChange(file, entry({ label: "only" }));
+  const before = readFileSync(file, "utf8");
+  pruneChanges(file);
+  assert.equal(readFileSync(file, "utf8"), before);
 });

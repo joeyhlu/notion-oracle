@@ -394,8 +394,8 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           if (!blocks.length) return fail("The markdown was empty, so there is nothing to replace the block with. Use delete_block to remove a block.");
           const result = await notion.replaceBlock(String(input.block_id), blocks);
           record(result.converted
-            ? { kind: "block", action: "update", label: `Changed a ${result.from} into a ${result.to}`, undo: { type: "delete-blocks", blockIds: result.blockIds, thenUnarchive: String(input.block_id) } }
-            : { kind: "block", action: "update", label: `Rewrote a ${result.to}`, undo: result.previous ? { type: "restore-block", blockId: result.blockIds[0], block: result.previous } : undefined });
+            ? { kind: "block", action: "update", label: `Changed a ${result.from} into a ${result.to}`, target: result.parentId, undo: { type: "delete-blocks", blockIds: result.blockIds, thenUnarchive: String(input.block_id) } }
+            : { kind: "block", action: "update", label: `Rewrote a ${result.to}`, target: result.parentId, undo: result.previous ? { type: "restore-block", blockId: result.blockIds[0], block: result.previous } : undefined });
           return ok({
             updated: true,
             type: result.to,
@@ -412,7 +412,7 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const blocks = markdownToBlocks(String(input.markdown ?? ""));
           if (!blocks.length) return fail("The markdown was empty, so there is nothing to insert.");
           const created = await notion.insertBlocksAfter(String(input.block_id), blocks);
-          if (created.length) record({ kind: "block", action: "create", label: `Inserted ${created.length} block${created.length === 1 ? "" : "s"}`, undo: { type: "delete-blocks", blockIds: created.map((b) => b.id) } });
+          if (created.length) record({ kind: "block", action: "create", label: `Inserted ${created.length} block${created.length === 1 ? "" : "s"}`, target: created.parentId, undo: { type: "delete-blocks", blockIds: created.map((b) => b.id) } });
           return ok({ inserted: created.length, after_block_id: input.block_id, block_ids: created.map((b) => b.id) });
         }
 

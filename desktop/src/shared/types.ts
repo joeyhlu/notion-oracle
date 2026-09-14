@@ -47,6 +47,10 @@ export interface Settings {
    *
    * Separate from everything else because it needs the macOS Accessibility permission, which is
    * broader than the rest of what Oracle does: it is the one grant that could read other apps.
+   *
+   * Off until asked for. Reading the selection is what triggers the permission prompt, and it
+   * happens on every panel open, so defaulting it on would greet an upgrading user with a
+   * request to control their computer that they never went looking for.
    */
   readSelection: boolean;
   setupComplete: boolean;
@@ -66,7 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarStrategy: "new-event-key",
   calendarBackend: "system",
   theme: "system",
-  readSelection: true,
+  readSelection: false,
   setupComplete: false,
 };
 

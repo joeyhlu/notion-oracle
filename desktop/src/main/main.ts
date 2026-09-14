@@ -17,7 +17,7 @@ import { getNotionSelection } from "./selection.ts";
 import { buildSystemPrompt, buildUserTurn } from "./prompt.ts";
 import { SettingsStore } from "./settings.ts";
 import { openTerminal } from "./terminal.ts";
-import { readChanges, rewriteChanges } from "../shared/journal-file.ts";
+import { pruneChanges, readChanges, rewriteChanges } from "../shared/journal-file.ts";
 import type { Change } from "../shared/journal.ts";
 import { undoChange } from "./undo.ts";
 import { ConversationStore } from "../shared/conversations-file.ts";
@@ -305,6 +305,8 @@ async function runChat(request: ChatRequest): Promise<void> {
     send({ type: "error", message: error instanceof Error ? error.message : String(error), threadId: request.threadId });
   } finally {
     if (activeRun === controller) activeRun = null;
+    // Between runs, with no child process appending, is the only safe moment to rewrite.
+    pruneChanges(journalPath());
   }
 }
 

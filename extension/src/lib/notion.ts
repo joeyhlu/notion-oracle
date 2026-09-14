@@ -76,6 +76,8 @@ export interface ReplaceResult {
   blockIds: string[];
   /** The body that was overwritten, for undo. Absent when the block was replaced, not patched. */
   previous?: Record<string, unknown>;
+  /** The page or block the target sits in, so a change can record where it happened. */
+  parentId?: string;
 }
 
 export interface ResolvedDataSource {
@@ -295,14 +297,16 @@ export class NotionClient {
    *
    * `known` lets a caller that has already fetched the target skip a second round trip.
    */
-  async insertBlocksAfter(blockId: string, blocks: NotionBlock[], known?: FetchedBlock & { parent?: Record<string, unknown> }): Promise<FetchedBlock[]> {
+  async insertBlocksAfter(blockId: string, blocks: NotionBlock[], known?: FetchedBlock & { parent?: Record<string, unknown> }): Promise<FetchedBlock[] & { parentId?: string }> {
     if (!blocks.length) return [];
     const target = normalizeId(blockId);
     const parentId = NotionClient.parentIdOf(known ?? await this.getBlock(target));
     // `after` positions the insert; without it Notion appends to the end of the parent.
     const response = await this.request<{ results?: FetchedBlock[] }>(
       "PATCH", `/blocks/${normalizeId(parentId)}/children`, { children: blocks, after: target });
-    return response.results ?? [];
+    const created = (response.results ?? []) as FetchedBlock[] & { parentId?: string };
+    created.parentId = parentId;
+    return created;
   }
 
   /**
@@ -327,12 +331,12 @@ export class NotionClient {
       const previous = { type: existing.type, [existing.type]: (existing as Record<string, unknown>)[existing.type] };
       await this.updateBlock(target, first);
       const extra = await this.insertBlocksAfter(target, blocks.slice(1), existing);
-      return { converted: false, from: existing.type, to: first.type, blockIds: [target, ...extra.map((b) => b.id)], previous };
+      return { converted: false, from: existing.type, to: first.type, blockIds: [target, ...extra.map((b) => b.id)], previous, parentId: NotionClient.parentIdOf(existing) };
     }
 
     const created = await this.insertBlocksAfter(target, blocks, existing);
     await this.deleteBlock(target);
-    return { converted: true, from: existing.type, to: first.type, blockIds: created.map((b) => b.id) };
+    return { converted: true, from: existing.type, to: first.type, blockIds: created.map((b) => b.id), parentId: NotionClient.parentIdOf(existing) };
   }
 
   /** Notion keeps archived blocks, so a delete Oracle made can be taken back. */

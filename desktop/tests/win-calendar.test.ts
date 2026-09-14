@@ -82,6 +82,18 @@ test("an all-day event sets the flag, a timed one does not", () => {
   assert.doesNotMatch(createEventScript({ title: "Standup", start: "2026-09-14T09:00:00" }), /AllDayEvent/);
 });
 
+test("the calendar folder is found by id, not by its English name", () => {
+  // Outlook names the folder in the user's language — Kalender, Calendrier, カレンダー — so
+  // Folders.Item('Calendar') finds nothing outside an English install. GetDefaultFolder takes a
+  // numeric id and is locale-independent; the name lookup stays only as a fallback.
+  for (const script of [listCalendarsScript(), listEventsScript(new Date(), new Date(), "Work")]) {
+    const byId = script.indexOf("GetDefaultFolder(9)");
+    const byName = script.indexOf("Folders.Item('Calendar')");
+    assert.ok(byId > -1, "must look the folder up by its numeric id");
+    if (byName > -1) assert.ok(byId < byName, "the id lookup must come first, with the name as fallback");
+  }
+});
+
 test("moving an event goes through Outlook's own Move, not a copy and delete", () => {
   // Unlike AppleScript, Outlook can move an item between folders, so nothing is duplicated.
   const script = moveEventScript("abc", "Personal");
