@@ -1,9 +1,12 @@
 /** Overlay UI: a collapsed pill, the chat panel, and the setup/settings view. */
 
 import { markdownToHtml } from "../../../extension/src/lib/markdown.ts";
-import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
+import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type Change, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
+import { summarise } from "../shared/journal.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+type View = "chat" | "setup" | "help" | "changes";
 
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
@@ -30,10 +33,12 @@ function applyMode(mode: "collapsed" | "expanded"): void {
 
 // ---------- Views ----------
 
-function showView(view: "chat" | "setup" | "help"): void {
+function showView(view: View): void {
   $("view-chat").hidden = view !== "chat";
   $("view-setup").hidden = view !== "setup";
   $("view-help").hidden = view !== "help";
+  $("view-changes").hidden = view !== "changes";
+  if (view === "changes") void renderChanges();
   if (view === "setup") void loadSetupForm();
   else if (view === "chat") setTimeout(() => $("input").focus(), 50);
 }
@@ -164,17 +169,32 @@ function handleEvent(event: ChatEvent): void {
       turn.thinking.hidden = false;
       break;
     }
-    case "done":
+    case "done": {
       threadId = event.threadId;
       finishTurn();
       if (turn.raw.trim()) addActions(turn.container, turn.raw);
+      // What actually changed, from the journal rather than from the model's own account of it:
+      // a reply that says "done!" after a tool failed should not claim an edit happened.
+      const line = summarise(event.changes ?? []);
+      if (line) turn.container.appendChild(changeFootnote(line));
       break;
+    }
     case "error":
       finishTurn();
       if (!turn.raw.trim()) turn.body.remove();
       showError(event.message);
       break;
   }
+}
+
+/** The "changed 3 blocks" line under a reply, with a way through to the list. */
+function changeFootnote(line: string): HTMLElement {
+  const node = el("div", "change-note");
+  node.appendChild(el("span", "change-note-text", line));
+  const review = el("button", "link-btn", "Review") as HTMLButtonElement;
+  review.addEventListener("click", () => showView("changes"));
+  node.appendChild(review);
+  return node;
 }
 
 function finishTurn(): void {
@@ -350,6 +370,67 @@ function applyTheme(theme: Theme): void {
   }
 }
 
+/** Short relative time: a change list is read in the minutes after the change. */
+function ago(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+async function renderChanges(): Promise<void> {
+  const host = $("changes");
+  const changes = await window.oracle.getChanges();
+  host.replaceChildren();
+  $("changes-note").textContent = changes.length ? `${changes.length} recorded` : "";
+  if (!changes.length) {
+    host.appendChild(el("div", "empty", "Nothing yet. Anything Oracle changes in Notion or your calendar shows up here."));
+    return;
+  }
+  for (const change of changes) host.appendChild(changeRow(change));
+}
+
+function changeRow(change: Change): HTMLElement {
+  const row = el("div", `change${change.undone ? " undone" : ""}`);
+  const main = el("div", "change-main");
+  main.append(el("div", "change-label", change.label), el("div", "change-when", ago(change.at)));
+  row.appendChild(main);
+
+  if (change.url) {
+    const open = el("button", "chip", "Open") as HTMLButtonElement;
+    open.addEventListener("click", () => void window.oracle.openExternal(change.url!));
+    row.appendChild(open);
+  }
+
+  if (change.undone) {
+    row.appendChild(el("span", "change-state", "undone"));
+    return row;
+  }
+  if (!change.undo) {
+    // Better to say why than to show a button that will fail.
+    row.appendChild(el("span", "change-state", "cannot undo"));
+    return row;
+  }
+  const undo = el("button", "chip", "Undo") as HTMLButtonElement;
+  undo.addEventListener("click", async () => {
+    undo.disabled = true;
+    undo.textContent = "Undoing…";
+    const result = await window.oracle.undoChange(change.id);
+    if (result.ok) {
+      void renderChanges();
+    } else {
+      undo.disabled = false;
+      undo.textContent = "Undo";
+      row.appendChild(el("div", "change-error", result.message));
+    }
+  });
+  row.appendChild(undo);
+  return row;
+}
+
 /** Opens one setup step and closes the others, so the screen never becomes a wall of forms. */
 function openStep(name: string): void {
   for (const step of document.querySelectorAll<HTMLElement>(".step")) {
@@ -436,6 +517,11 @@ function wireControls(): void {
   $("btn-new").addEventListener("click", resetConversation);
   $("btn-settings").addEventListener("click", () => showView($("view-setup").hidden ? "setup" : "chat"));
   $("btn-help").addEventListener("click", () => showView($("view-help").hidden ? "help" : "chat"));
+  $("btn-changes").addEventListener("click", () => showView($("view-changes").hidden ? "changes" : "chat"));
+  $("btn-clear-changes").addEventListener("click", async () => {
+    await window.oracle.clearChanges();
+    void renderChanges();
+  });
   $("btn-help-setup").addEventListener("click", () => showView("setup"));
 
   $("theme-toggle").addEventListener("click", (event) => {

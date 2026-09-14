@@ -16,6 +16,9 @@ import { getNotionWindowTitle } from "./notion-window.ts";
 import { buildSystemPrompt, buildUserTurn } from "./prompt.ts";
 import { SettingsStore } from "./settings.ts";
 import { openTerminal } from "./terminal.ts";
+import { readChanges, rewriteChanges } from "../shared/journal-file.ts";
+import type { Change } from "../shared/journal.ts";
+import { undoChange } from "./undo.ts";
 
 const COLLAPSED = { width: 64, height: 64 };
 const EXPANDED = { width: 420, height: 680 };
@@ -194,7 +197,7 @@ function mcpSpecs(current: Settings): McpServerSpec[] {
       name: "notion",
       command: process.execPath,
       args: [serverScriptPath("notion-server.js")],
-      env: { ...NODE_ENV, NOTION_TOKEN: current.notionToken },
+      env: { ...NODE_ENV, NOTION_TOKEN: current.notionToken, ORACLE_JOURNAL: journalPath() },
       toolNames: NOTION_API_TOOLS.map((t) => t.name),
     },
   ];
@@ -203,11 +206,18 @@ function mcpSpecs(current: Settings): McpServerSpec[] {
       name: "calendar",
       command: process.execPath,
       args: [serverScriptPath("calendar-server.js")],
-      env: { ...NODE_ENV, CALENDAR_AUTO_SAVE: current.calendarAutoSave ? "1" : "0", CALENDAR_STRATEGY: current.calendarStrategy, CALENDAR_BACKEND: current.calendarBackend, CALENDAR_STATE_DIR: app.getPath("userData") },
+      env: { ...NODE_ENV, CALENDAR_AUTO_SAVE: current.calendarAutoSave ? "1" : "0", CALENDAR_STRATEGY: current.calendarStrategy, CALENDAR_BACKEND: current.calendarBackend, CALENDAR_STATE_DIR: app.getPath("userData"), ORACLE_JOURNAL: journalPath() },
       toolNames: [...CALENDAR_TOOL_NAMES],
     });
   }
   return servers;
+}
+
+const journalPath = (): string => join(app.getPath("userData"), "changes.jsonl");
+
+/** Entries written since `since`, which is how a turn reports only its own changes. */
+function changesSince(since: string): Change[] {
+  return readChanges(journalPath()).filter((c) => c.at > since);
 }
 
 async function runChat(request: ChatRequest): Promise<void> {
@@ -227,6 +237,9 @@ async function runChat(request: ChatRequest): Promise<void> {
   mkdirSync(tempDir, { recursive: true });
   mkdirSync(cwd, { recursive: true });
   send({ type: "status", message: "Starting…" });
+  // Sampled before the run so the turn reports what it changed, not the whole history.
+  const startedAt = new Date().toISOString();
+  const withChanges = (event: ChatEvent) => send(event.type === "done" ? { ...event, changes: changesSince(startedAt) } : event);
   try {
     const hint = { notionWindowTitle: await getNotionWindowTitle() };
     await brain.run({
@@ -239,7 +252,7 @@ async function runChat(request: ChatRequest): Promise<void> {
       cwd,
       tempDir,
       signal: controller.signal,
-      onEvent: send,
+      onEvent: withChanges,
     });
   } catch (error) {
     send({ type: "error", message: error instanceof Error ? error.message : String(error), threadId: request.threadId });
@@ -283,6 +296,22 @@ function registerIpc(): void {
   ipcMain.handle("oracle:platform", () => process.platform);
   ipcMain.handle("oracle:chat-send", (_e, request: ChatRequest) => void runChat(request));
   ipcMain.handle("oracle:chat-abort", () => activeRun?.abort());
+  ipcMain.handle("oracle:get-changes", () => readChanges(journalPath()));
+  ipcMain.handle("oracle:clear-changes", () => rewriteChanges(journalPath(), () => null));
+  ipcMain.handle("oracle:undo-change", async (_e, id: string) => {
+    const change = readChanges(journalPath()).find((c) => c.id === id);
+    if (!change) return { ok: false, message: "That change is no longer in the list." };
+    if (change.undone) return { ok: false, message: "Already undone." };
+    const token = settings.get().notionToken;
+    try {
+      const result = await undoChange(change, token ? new NotionClient(token) : null);
+      // Marked only on success, so a failed undo stays available to retry.
+      if (result.ok) rewriteChanges(journalPath(), (c) => (c.id === id ? { ...c, undone: true } : c));
+      return result;
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle("oracle:set-mode", (_e, next: OverlayMode) => setMode(next));
   ipcMain.handle("oracle:quit", () => app.quit());
 }

@@ -9,6 +9,7 @@ import { APP_NAME, activateCalendarApp, calendarAppStatus, createCalendarEvent, 
 import * as mac from "./mac-calendar.ts";
 import { CALENDAR_TOOL_NAMES } from "./calendar-tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
+import { appendChange } from "../shared/journal-file.ts";
 
 const DEFAULT_STRATEGY: Strategy = process.env.CALENDAR_STRATEGY === "command-bar" ? "command-bar" : "new-event-key";
 const AUTO_SAVE = process.env.CALENDAR_AUTO_SAVE === "1";
@@ -194,6 +195,15 @@ async function status(): Promise<Record<string, unknown>> {
   }
 }
 
+/**
+ * Journal hook. Calendar changes are recorded like Notion ones so a mistaken event can be taken
+ * back from the same list, rather than being the one kind of change with no way home.
+ */
+const journal = process.env.ORACLE_JOURNAL ?? "";
+const record = (change: Parameters<typeof appendChange>[1]): void => {
+  if (journal) appendChange(journal, change);
+};
+
 export const execute: ToolExecutor = async (name, input) => {
   try {
     switch (name) {
@@ -227,6 +237,7 @@ export const execute: ToolExecutor = async (name, input) => {
           location: input.location ? String(input.location) : undefined,
           notes: input.notes ? String(input.notes) : undefined,
         });
+        record({ tool: "calendar", kind: "event", action: "create", label: `Added "${String(input.title ?? "")}" to ${created.calendar}`, target: created.calendar, undo: { type: "delete-event", uid: created.uid, calendar: created.calendar } });
         return ok({ created: true, ...created, note: `Added to "${created.calendar}". It syncs to the account and will appear in ${APP_NAME} shortly.` });
       }
 
@@ -241,6 +252,8 @@ export const execute: ToolExecutor = async (name, input) => {
       }
 
       case "calendar_update_event": {
+        // Read the event before changing it; there is no other way back to its old fields.
+        const before = await mac.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
         await mac.updateEvent({
           uid: String(input.uid ?? ""),
           calendar: String(input.calendar ?? ""),
@@ -250,11 +263,18 @@ export const execute: ToolExecutor = async (name, input) => {
           location: input.location === undefined ? undefined : String(input.location),
           notes: input.notes === undefined ? undefined : String(input.notes),
         });
+        record({ tool: "calendar", kind: "event", action: "update", label: `Changed "${before?.title ?? "an event"}"`, target: String(input.calendar ?? ""),
+          undo: before ? { type: "restore-event", uid: String(input.uid ?? ""), calendar: String(input.calendar ?? ""), fields: { ...before } } : undefined });
         return ok({ updated: true, uid: input.uid });
       }
 
       case "calendar_delete_event": {
+        // Calendar.app has no trash, so the fields are the only copy: capture them or the delete
+        // really is final.
+        const doomed = await mac.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
         await mac.deleteEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
+        record({ tool: "calendar", kind: "event", action: "delete", label: `Deleted "${doomed?.title ?? "an event"}"`, target: String(input.calendar ?? ""),
+          undo: doomed ? { type: "restore-event", uid: String(input.uid ?? ""), calendar: String(input.calendar ?? ""), fields: { ...doomed } } : undefined });
         return ok({ deleted: true, uid: input.uid });
       }
 

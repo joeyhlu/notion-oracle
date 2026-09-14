@@ -218,10 +218,28 @@ function describeSearchHit(r: NotionPage | NotionDataSource): Record<string, unk
 
 export type PageToolRunner = (name: PageToolName, input: Record<string, unknown>) => Promise<PageToolResponse>;
 
+/** What a mutating tool reports about itself, for the change journal. */
+export interface RecordedChange {
+  kind: "block" | "page" | "event";
+  action: "create" | "update" | "delete";
+  label: string;
+  target?: string;
+  url?: string;
+  undo?: Record<string, unknown>;
+}
+
 export interface ExecutorDeps {
   notion: NotionClient | null;
   runPageTool: PageToolRunner;
   currentPageId: string | null;
+  /**
+   * Called after a tool changes something, with enough state to reverse it.
+   *
+   * It lives here rather than wrapping the executor from outside because the before-state — the
+   * body a block had before it was overwritten, the properties a page had — is visible only at
+   * the point of the call and is deliberately not in the result the model sees.
+   */
+  recordChange?: (change: RecordedChange) => void;
 }
 
 const ok = (content: unknown): ToolOutcome => ({ ok: true, content: typeof content === "string" ? content : JSON.stringify(content, null, 2) });
@@ -231,6 +249,13 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
   const requireNotion = (): NotionClient => {
     if (!deps.notion) throw new Error("No Notion integration token is configured. Ask the user to add one in Oracle settings, or use the page tools instead.");
     return deps.notion;
+  };
+  const record = (change: RecordedChange): void => {
+    try {
+      deps.recordChange?.(change);
+    } catch {
+      // Journalling is bookkeeping; never fail the user's edit over it.
+    }
   };
   const resolvePageId = (given: unknown): string => {
     const id = typeof given === "string" && given.trim() ? given : deps.currentPageId;
@@ -315,6 +340,7 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
             { title: { title: [{ type: "text", text: { content: String(input.title ?? "Untitled") } }] } },
             typeof input.content_markdown === "string" ? input.content_markdown : undefined,
           );
+          record({ kind: "page", action: "create", label: `Created page "${String(input.title ?? "Untitled")}"`, target: page.id, url: page.url, undo: { type: "archive-page", pageId: page.id } });
           return ok({ created: true, id: page.id, url: page.url });
         }
 
@@ -326,6 +352,7 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           if (!(titleProp in values) && typeof input.title === "string") values[titleProp] = input.title;
           const properties = coerceProperties(resolved.properties, values);
           const page = await notion.createPage({ type: "data_source_id", data_source_id: resolved.dataSourceId }, properties, typeof input.content_markdown === "string" ? input.content_markdown : undefined);
+          record({ kind: "page", action: "create", label: `Added "${String(values[titleProp] ?? input.title ?? "Untitled")}" to the database`, target: page.id, url: page.url, undo: { type: "archive-page", pageId: page.id } });
           return ok({ created: true, id: page.id, url: page.url, properties: summarizeProperties(page.properties) });
         }
 
@@ -345,6 +372,10 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
             properties = coerceProperties(schema, values);
           }
           const updated = await notion.updatePage(id, properties);
+          // `page` was fetched above, so the values being overwritten are already in hand; only
+          // the properties this call touches are kept, so undo restores those and nothing else.
+          const before = Object.fromEntries(Object.keys(properties).filter((k) => k in page.properties).map((k) => [k, page.properties[k]]));
+          record({ kind: "page", action: "update", label: `Updated ${Object.keys(properties).length} propert${Object.keys(properties).length === 1 ? "y" : "ies"} on "${pageTitle(updated)}"`, target: id, url: updated.url, undo: { type: "restore-page-properties", pageId: id, properties: before } });
           return ok({ updated: true, id: updated.id, url: updated.url, properties: summarizeProperties(updated.properties) });
         }
 
@@ -362,6 +393,9 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const blocks = markdownToBlocks(String(input.markdown ?? ""));
           if (!blocks.length) return fail("The markdown was empty, so there is nothing to replace the block with. Use delete_block to remove a block.");
           const result = await notion.replaceBlock(String(input.block_id), blocks);
+          record(result.converted
+            ? { kind: "block", action: "update", label: `Changed a ${result.from} into a ${result.to}`, undo: { type: "delete-blocks", blockIds: result.blockIds, thenUnarchive: String(input.block_id) } }
+            : { kind: "block", action: "update", label: `Rewrote a ${result.to}`, undo: result.previous ? { type: "restore-block", blockId: result.blockIds[0], block: result.previous } : undefined });
           return ok({
             updated: true,
             type: result.to,
@@ -378,20 +412,23 @@ export function createToolExecutor(deps: ExecutorDeps): ToolExecutor {
           const blocks = markdownToBlocks(String(input.markdown ?? ""));
           if (!blocks.length) return fail("The markdown was empty, so there is nothing to insert.");
           const created = await notion.insertBlocksAfter(String(input.block_id), blocks);
+          if (created.length) record({ kind: "block", action: "create", label: `Inserted ${created.length} block${created.length === 1 ? "" : "s"}`, undo: { type: "delete-blocks", blockIds: created.map((b) => b.id) } });
           return ok({ inserted: created.length, after_block_id: input.block_id, block_ids: created.map((b) => b.id) });
         }
 
         case "delete_block": {
           const notion = requireNotion();
           await notion.deleteBlock(String(input.block_id));
+          record({ kind: "block", action: "delete", label: "Deleted a block", undo: { type: "unarchive-block", blockId: String(input.block_id) } });
           return ok({ deleted: true, block_id: input.block_id, note: "Moved to Notion's trash; it can be restored from there." });
         }
 
         case "append_to_page": {
           const notion = requireNotion();
           const id = resolvePageId(input.page_id);
-          const count = await notion.appendMarkdown(id, String(input.content_markdown ?? ""));
-          return ok({ appended_blocks: count, page_id: id });
+          const appended = await notion.appendMarkdown(id, String(input.content_markdown ?? ""));
+          if (appended.length) record({ kind: "block", action: "create", label: `Appended ${appended.length} block${appended.length === 1 ? "" : "s"}`, target: id, undo: { type: "delete-blocks", blockIds: appended } });
+          return ok({ appended_blocks: appended.length, page_id: id });
         }
 
         default:

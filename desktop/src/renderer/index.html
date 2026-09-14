@@ -14,6 +14,7 @@
       <div class="title"><span class="dot"></span>Oracle</div>
       <span id="brain-label" class="model"></span>
       <button class="icon-btn" id="btn-new" title="New conversation">+</button>
+      <button class="icon-btn" id="btn-changes" title="What Oracle changed">⟲</button>
       <button class="icon-btn" id="btn-help" title="Help &amp; FAQ">?</button>
       <button class="icon-btn" id="btn-settings" title="Setup">⚙</button>
       <button class="icon-btn" id="btn-collapse" title="Collapse">✕</button>
@@ -154,6 +155,19 @@
         <button id="btn-save" class="send">Save</button>
         <span id="save-status" class="muted"></span>
         <button id="btn-quit" class="chip quit">Quit Oracle</button>
+      </div>
+    </section>
+
+    <!-- ---------- Changes ---------- -->
+    <section id="view-changes" class="view scroll" hidden>
+      <div class="view-head">
+        <h1>Changes</h1>
+        <p class="muted">Everything Oracle has changed in Notion and your calendar. Undo puts it back.</p>
+      </div>
+      <div id="changes"></div>
+      <div class="setup-footer">
+        <button id="btn-clear-changes" class="chip">Clear list</button>
+        <span id="changes-note" class="muted"></span>
       </div>
     </section>
 

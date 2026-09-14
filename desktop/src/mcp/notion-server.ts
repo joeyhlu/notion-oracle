@@ -6,6 +6,11 @@
 import { NotionClient } from "../../../extension/src/lib/notion.ts";
 import { NOTION_API_TOOLS, createToolExecutor } from "../../../extension/src/lib/tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
+import { appendChange } from "../shared/journal-file.ts";
+import type { UndoStep } from "../shared/journal.ts";
+
+// Set by the main process. Absent in the extension build and in tests, where nothing records.
+const journal = process.env.ORACLE_JOURNAL ?? "";
 
 const token = process.env.NOTION_TOKEN ?? "";
 const notion = token ? new NotionClient(token) : null;
@@ -21,6 +26,9 @@ export const server = new StdioMcpServer({
     notion,
     currentPageId: process.env.NOTION_CURRENT_PAGE_ID || null,
     runPageTool: async () => ({ ok: false, content: "Page tools are only available in the browser extension." }),
+    recordChange: journal
+      ? (change) => appendChange(journal, { tool: "notion", ...change, undo: change.undo as UndoStep | undefined })
+      : undefined,
   }),
 });
 

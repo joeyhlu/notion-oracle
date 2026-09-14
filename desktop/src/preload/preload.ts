@@ -12,6 +12,9 @@ const api: OracleApi = {
   platform: () => ipcRenderer.invoke("oracle:platform"),
   chatSend: (request: ChatRequest) => ipcRenderer.invoke("oracle:chat-send", request),
   chatAbort: () => ipcRenderer.invoke("oracle:chat-abort"),
+  getChanges: () => ipcRenderer.invoke("oracle:get-changes"),
+  undoChange: (id: string) => ipcRenderer.invoke("oracle:undo-change", id),
+  clearChanges: () => ipcRenderer.invoke("oracle:clear-changes"),
   onChatEvent: (callback: (event: ChatEvent) => void) => {
     const listener = (_: unknown, event: ChatEvent) => callback(event);
     ipcRenderer.on("oracle:chat-event", listener);

@@ -1,5 +1,9 @@
 /** Contract between the Electron main process and the renderer. */
 
+import type { Change } from "./journal.ts";
+
+export type { Change } from "./journal.ts";
+
 export type BrainId = "claude" | "codex";
 
 export type Theme = "system" | "light" | "dark";
@@ -71,7 +75,8 @@ export type ChatEvent =
   | { type: "text"; delta: string }
   | { type: "tool-start"; id: string; name: string; input: unknown }
   | { type: "tool-end"; id: string; name: string; ok: boolean; summary: string }
-  | { type: "done"; threadId: string | null; text: string }
+  /** `changes` is attached by the main process; a brain does not know what its tools touched. */
+  | { type: "done"; threadId: string | null; text: string; changes?: Change[] }
   | { type: "error"; message: string; threadId: string | null };
 
 export interface ChatRequest {
@@ -112,6 +117,10 @@ export interface OracleApi {
   platform(): Promise<NodeJS.Platform>;
   chatSend(request: ChatRequest): Promise<void>;
   chatAbort(): Promise<void>;
+  /** Everything Oracle has changed, newest first. */
+  getChanges(): Promise<Change[]>;
+  undoChange(id: string): Promise<{ ok: boolean; message: string }>;
+  clearChanges(): Promise<void>;
   onChatEvent(callback: (event: ChatEvent) => void): () => void;
   setMode(mode: OverlayMode): Promise<void>;
   onMode(callback: (mode: OverlayMode) => void): () => void;

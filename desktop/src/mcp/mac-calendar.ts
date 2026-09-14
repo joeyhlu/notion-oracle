@@ -392,6 +392,11 @@ export async function updateEvent(input: UpdateEventInput): Promise<void> {
  * Moves an event between calendars. AppleScript cannot reassign an event's calendar, so this
  * copies it across and deletes the original - which means a new uid.
  */
+export async function findEvent(uid: string, calendar: string): Promise<CalendarEvent | null> {
+  assertMac();
+  return parseEvents(await runAppleScript(findEventScript(uid, await resolveCalendar(calendar))))[0] ?? null;
+}
+
 export async function moveEvent(uid: string, fromCalendar: string, toCalendar: string): Promise<{ uid: string; calendar: string }> {
   assertMac();
   const source = await resolveCalendar(fromCalendar);

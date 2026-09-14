@@ -43,6 +43,12 @@ function installBridge(ready) {
     getPageHint: async () => null,
     testNotion: async () => ({ ok: true, message: "Connected" }),
     chatSend: async () => {}, chatAbort: async () => {},
+    getChanges: async () => window.__changes ?? [],
+    undoChange: async (id) => {
+      window.__changes = (window.__changes ?? []).map((c) => (c.id === id ? { ...c, undone: true } : c));
+      return { ok: true, message: "Removed." };
+    },
+    clearChanges: async () => { window.__changes = []; },
     setMode: () => {}, openExternal: () => {}, openSignIn: () => {}, quit: () => {},
     onChatEvent: () => {}, onMode: () => {},
   };
@@ -89,7 +95,7 @@ for (const ready of [true, false]) {
   await page.waitForFunction(() => !document.getElementById("setup-summary").textContent.startsWith("Checking"));
 
   /** Ids of the views the browser is actually painting. */
-  const shown = () => page.evaluate(() => ["view-chat", "view-setup", "view-help"]
+  const shown = () => page.evaluate(() => ["view-chat", "view-setup", "view-help", "view-changes"]
     .filter((id) => getComputedStyle(document.getElementById(id)).display !== "none"));
   const displayed = (id) => page.evaluate(
     (x) => getComputedStyle(document.getElementById(x)).display !== "none", id);
@@ -140,6 +146,36 @@ for (const ready of [true, false]) {
     const ratio = contrast(bg, fg);
     check(`${state}: ${name} text is readable (${ratio.toFixed(1)}:1)`, ratio >= 4.5, true);
   }
+
+  // The Changes view: an empty state, a row per change, and Undo that visibly takes effect.
+  await page.evaluate(() => {
+    window.__changes = [];
+  });
+  await page.click("#btn-changes");
+  check(`${state}: changes only`, await shown(), ["view-changes"]);
+  check(`${state}: empty state`, await page.locator("#changes .empty").count(), 1);
+
+  await page.evaluate(() => {
+    window.__changes = [
+      { id: "c1", at: new Date().toISOString(), tool: "notion", kind: "block", action: "create",
+        label: "Appended 3 blocks", target: "p1", url: "https://notion.so/p1",
+        undo: { type: "delete-blocks", blockIds: ["a", "b", "c"] } },
+      { id: "c2", at: new Date(Date.now() - 3.6e6).toISOString(), tool: "calendar", kind: "event",
+        action: "delete", label: "Deleted \"Standup\"" },
+    ];
+  });
+  // Leave and re-enter so the list re-reads the bridge.
+  await page.click("#btn-changes");
+  await page.click("#btn-changes");
+  check(`${state}: a row per change`, await page.locator("#changes .change").count(), 2);
+  // A change with no recorded reverse says so instead of offering a button that would fail.
+  check(`${state}: unreversible change is labelled`, await page.locator("#changes .change-state").innerText(), "cannot undo");
+  check(`${state}: relative time`, await page.locator("#changes .change-when").first().innerText(), "just now");
+
+  await page.locator("#changes .change").first().getByText("Undo").click();
+  await page.waitForFunction(() => document.querySelectorAll("#changes .change.undone").length === 1);
+  check(`${state}: undo marks the row`, await page.locator("#changes .change.undone").count(), 1);
+  await shot("changes");
 
   check(`${state}: console clean`, noise, []);
   await page.close();

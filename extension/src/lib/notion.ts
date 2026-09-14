@@ -74,6 +74,8 @@ export interface ReplaceResult {
   to: string;
   /** Ids of the blocks now holding the content, in order. */
   blockIds: string[];
+  /** The body that was overwritten, for undo. Absent when the block was replaced, not patched. */
+  previous?: Record<string, unknown>;
 }
 
 export interface ResolvedDataSource {
@@ -231,14 +233,18 @@ export class NotionClient {
     return page;
   }
 
-  async appendBlocks(blockId: string, blocks: NotionBlock[]): Promise<number> {
+  /** Returns the ids Notion assigned, in order, so a caller can undo the append. */
+  async appendBlocks(blockId: string, blocks: NotionBlock[]): Promise<string[]> {
+    const ids: string[] = [];
     for (let i = 0; i < blocks.length; i += MAX_CHILDREN_PER_REQUEST) {
-      await this.request("PATCH", `/blocks/${normalizeId(blockId)}/children`, { children: blocks.slice(i, i + MAX_CHILDREN_PER_REQUEST) });
+      const page = await this.request<{ results?: FetchedBlock[] }>(
+        "PATCH", `/blocks/${normalizeId(blockId)}/children`, { children: blocks.slice(i, i + MAX_CHILDREN_PER_REQUEST) });
+      for (const created of page.results ?? []) ids.push(created.id);
     }
-    return blocks.length;
+    return ids;
   }
 
-  appendMarkdown(blockId: string, markdown: string): Promise<number> {
+  appendMarkdown(blockId: string, markdown: string): Promise<string[]> {
     return this.appendBlocks(blockId, markdownToBlocks(markdown));
   }
 
@@ -318,14 +324,30 @@ export class NotionClient {
     const existing = await this.getBlock(target);
 
     if (existing.type === first.type) {
+      const previous = { type: existing.type, [existing.type]: (existing as Record<string, unknown>)[existing.type] };
       await this.updateBlock(target, first);
       const extra = await this.insertBlocksAfter(target, blocks.slice(1), existing);
-      return { converted: false, from: existing.type, to: first.type, blockIds: [target, ...extra.map((b) => b.id)] };
+      return { converted: false, from: existing.type, to: first.type, blockIds: [target, ...extra.map((b) => b.id)], previous };
     }
 
     const created = await this.insertBlocksAfter(target, blocks, existing);
     await this.deleteBlock(target);
     return { converted: true, from: existing.type, to: first.type, blockIds: created.map((b) => b.id) };
+  }
+
+  /** Notion keeps archived blocks, so a delete Oracle made can be taken back. */
+  unarchiveBlock(blockId: string): Promise<FetchedBlock> {
+    return this.request("PATCH", `/blocks/${normalizeId(blockId)}`, { archived: false });
+  }
+
+  /** Sends a page Oracle created to the trash, which is the reverse of creating it. */
+  archivePage(pageId: string): Promise<NotionPage> {
+    return this.request("PATCH", `/pages/${normalizeId(pageId)}`, { archived: true });
+  }
+
+  /** Writes a raw block body back, bypassing the type check replaceBlock does. */
+  restoreBlock(blockId: string, body: Record<string, unknown>): Promise<FetchedBlock> {
+    return this.request("PATCH", `/blocks/${normalizeId(blockId)}`, body);
   }
 
   updatePage(pageId: string, properties: Record<string, unknown>): Promise<NotionPage> {
