@@ -49,9 +49,11 @@ test("initialize and tools/list expose this platform's calendar tools, each with
   const tools = replies.get(2)!.result!.tools as Array<{ name: string; inputSchema: unknown }>;
   const names = tools.map((t) => t.name);
   assert.deepEqual(names, CALENDAR_TOOLS.map((t) => t.name));
-  // The keystroke fallback exists everywhere; the scriptable system-calendar tools are macOS-only.
+  // The keystroke fallback exists everywhere. The real read/write tools need a calendar Oracle
+  // can drive: Calendar.app on macOS, Outlook on Windows. Linux has neither.
+  const HAS_REAL_CALENDAR = process.platform === "darwin" || process.platform === "win32";
   assert.ok(names.includes("calendar_create_event_by_keystrokes"));
-  assert.equal(names.includes("calendar_create_event"), process.platform === "darwin");
+  assert.equal(names.includes("calendar_create_event"), HAS_REAL_CALENDAR);
   assert.ok(
     tools.every((t) => t.inputSchema && typeof t.inputSchema === "object"),
     "every tool must carry an inputSchema",
@@ -77,14 +79,14 @@ test("calendar_status reports both backends and how each is set up", async () =>
   };
   assert.equal(status.notion_calendar_app.platform, process.platform);
   assert.equal(status.notion_calendar_app.running, false);
-  if (process.platform === "darwin") {
+  if (process.platform === "darwin" || process.platform === "win32") {
     assert.equal(status.default_backend, "system-calendar");
   } else {
-    // Only macOS has a scriptable system calendar, so elsewhere the keystroke path is the default
-    // and the status explains why the better one is missing.
+    // Linux has no calendar Oracle can read or write, so the keystroke path is the default and
+    // the status says why the better one is missing.
     assert.equal(status.default_backend, "notion-app-keystrokes");
     assert.equal(status.system_calendar.available, false);
-    assert.match(status.system_calendar.reason ?? "", /macOS/);
+    assert.match(status.system_calendar.reason ?? "", /macOS and Windows/);
   }
 });
 
