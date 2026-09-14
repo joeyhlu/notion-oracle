@@ -158,6 +158,28 @@ body.collapsed .panel { display: none; }
 .icon-btn:hover { background: var(--paper-2); color: var(--ink); }
 .icon-btn:active { background: var(--line); }
 
+/*
+ * Tooltips. The native `title` takes about a second to appear and is drawn by the OS in a style
+ * nothing else here shares; on a six-button row where the glyphs are the only labels, that delay
+ * is the difference between a discoverable header and a guessing game. One word each.
+ *
+ * Drawn on the header rather than the button so it is not clipped by the button's own box, and
+ * positioned from the button through a CSS variable set per child — a tooltip that escaped the
+ * panel would be cut off by its overflow:hidden.
+ */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+  padding: 3px 7px; border-radius: var(--r-sm); white-space: nowrap;
+  background: var(--solid); color: var(--solid-fg); font-size: 11px; font-weight: 500;
+  letter-spacing: 0; pointer-events: none; opacity: 0; transition: opacity 90ms ease 40ms;
+  z-index: 5;
+}
+[data-tip]:hover::after { opacity: 1; }
+/* The last buttons sit against the right edge; pull their tooltips in so they stay on screen. */
+.header > [data-tip]:nth-last-child(-n+2)::after { left: auto; right: 0; transform: none; }
+
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ---------- Chat ---------- */

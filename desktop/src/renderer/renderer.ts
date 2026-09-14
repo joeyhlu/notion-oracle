@@ -114,9 +114,15 @@ function el(tag: string, className: string, text?: string): HTMLElement {
 
 function renderEmpty(): void {
   messages().replaceChildren();
+  showSuggestions(true);
   const empty = el("div", "empty");
   empty.innerHTML = "<strong>Hi, I'm Oracle.</strong>Ask about the page you have open in Notion, draft content, or add events to a calendar. Everything I change shows up in Notion right away.";
   messages().appendChild(empty);
+}
+
+/** The suggestion row is part of the empty state: an opener, not a permanent toolbar. */
+function showSuggestions(show: boolean): void {
+  $("quick").hidden = !show;
 }
 
 function scrollToBottom(): void {
@@ -158,6 +164,7 @@ async function send(text: string): Promise<void> {
   input.value = "";
   input.style.height = "auto";
   messages().querySelector(".empty")?.remove();
+  showSuggestions(false);
   messages().appendChild(el("div", "msg user", trimmed));
 
   const container = el("div", "msg assistant");
@@ -481,6 +488,7 @@ async function openConversation(id: string): Promise<void> {
   conversationId = conversation.id;
   threadId = conversation.threadId;
   messages().replaceChildren();
+  showSuggestions(conversation.messages.length === 0);
   for (const message of conversation.messages) {
     if (message.role === "user") messages().appendChild(el("div", "msg user", message.text));
     else renderSavedReply(message.text);

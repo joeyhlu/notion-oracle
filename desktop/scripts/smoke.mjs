@@ -117,6 +117,39 @@ for (const ready of [true, false]) {
     if (!setup.hidden) document.getElementById("btn-settings").click();
   });
   check(`${state}: chat only`, await shown(), ["view-chat"]);
+
+  // The suggestions are an opener, not a permanent toolbar: they go once a turn has started.
+  check(`${state}: suggestions on the empty chat`, await page.locator("#quick").isVisible(), true);
+  await page.evaluate(() => {
+    document.getElementById("input").value = "hello";
+    document.getElementById("send").click();
+  });
+  await page.waitForFunction(() => document.getElementById("quick").hidden);
+  check(`${state}: suggestions gone after sending`, await page.locator("#quick").isVisible(), false);
+  // A new conversation is a first message again, so they come back.
+  await page.click("#btn-new");
+  check(`${state}: suggestions return on a new chat`, await page.locator("#quick").isVisible(), true);
+
+  // Every header button names itself on hover, instantly and in the app's own style.
+  const tips = await page.evaluate(() => [...document.querySelectorAll(".header [data-tip]")]
+    .map((b) => b.dataset.tip));
+  check(`${state}: every header button has a tip`, tips, ["New chat", "History", "Changes", "Help", "Setup", "Close"]);
+  check(`${state}: tips are one or two words`, tips.every((t) => t.split(" ").length <= 2), true);
+  check(`${state}: tip is hidden until hover`, await page.evaluate(
+    () => getComputedStyle(document.getElementById("btn-help"), "::after").opacity), "0");
+  await page.hover("#btn-help");
+  await page.waitForFunction(
+    () => getComputedStyle(document.getElementById("btn-help"), "::after").opacity === "1");
+  check(`${state}: tip appears on hover`, await page.evaluate(
+    () => getComputedStyle(document.getElementById("btn-help"), "::after").content), '"Help"');
+  // A tooltip that ran past the panel edge would be clipped away by its overflow:hidden.
+  await page.hover("#btn-collapse");
+  check(`${state}: the last tip stays inside the panel`, await page.evaluate(() => {
+    const panel = document.querySelector(".panel").getBoundingClientRect();
+    const btn = document.getElementById("btn-collapse").getBoundingClientRect();
+    return btn.right <= panel.right;
+  }), true);
+  await page.mouse.move(0, 300);
   // The banner is the one thing that tells you the app cannot answer yet.
   check(`${state}: banner shown`, await displayed("setup-banner"), !ready);
   await shot("chat");
