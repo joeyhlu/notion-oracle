@@ -1,93 +1,105 @@
 /*
  * Design notes
  *
- * Sharp rather than soft. The things that make an interface look generated — a violet accent,
- * 14px radii on everything, stacked drop shadows, lozenge buttons, generous padding standing in
- * for hierarchy — are deliberately absent. Instead:
+ * This panel floats beside the Notion desktop app, so it should look like it belongs there rather
+ * than like a different product parked on top. The palette, radii, hover washes and shadow stack
+ * below are Notion's own idiom:
  *
- *   - one ink-and-paper palette; the only saturated colour is reserved for status and focus
- *   - a radius scale with three steps, none of them large, and none of them pill-shaped
- *   - hairline rules do the separating; exactly one element in the app casts a shadow
- *   - density: 13px base, tight tracking, small caps micro-labels
- *   - the primary button is near-black, not a colour
+ *   - warm neutrals, not cool grey. Notion's ink is #37352f, a brown-black, and its greys are that
+ *     colour at low alpha rather than separate swatches. Using alpha means every surface tints
+ *     itself against whatever is behind it, which is why Notion's hover states feel soft.
+ *   - blue #2383e2 is the one accent, used for the primary action and links and nothing else.
+ *   - small radii. 3px on controls, 5px on containers. Notion never rounds a button to 8px.
+ *   - the shadow is Notion's three-layer menu stack — a hairline ring plus two spreads — not a
+ *     single soft blur.
+ *   - system font. Notion ships no typeface of its own, and a bundled one would read as foreign
+ *     next to it.
  */
 
 :root {
+  --ink: #37352f;
+  --ink-2: rgba(55, 53, 47, 0.65);
+  --ink-3: rgba(55, 53, 47, 0.45);
   --paper: #ffffff;
-  --paper-2: #f7f7f6;        /* recessed fill: inputs, code, hover */
-  --ink: #141413;
-  --ink-2: #6f6f6c;          /* secondary text */
-  --ink-3: #9a9a96;          /* tertiary: hints, placeholders */
-  --line: #e3e3e0;           /* hairline */
-  --line-2: #cfcfca;         /* emphasised hairline: focus, hover borders */
-  --solid: #141413;          /* primary button */
-  --solid-fg: #ffffff;
-  --accent: #2b5fd9;         /* links and focus only */
-  --accent-soft: #eaeffc;
-  --good: #1f7a4d;
-  --good-soft: #e6f2ec;
-  --bad: #b4281f;
-  --bad-soft: #fbeae9;
-  --user-bubble: #f0f0ee;
+  --paper-2: #f7f7f5;          /* Notion's sidebar ground */
+  --line: rgba(55, 53, 47, 0.09);
+  --line-2: rgba(55, 53, 47, 0.16);
+  --wash: rgba(55, 53, 47, 0.06);   /* hover */
+  --wash-2: rgba(55, 53, 47, 0.11); /* pressed */
+  /*
+   * Two blues, because one cannot do both jobs. The fill sits behind white text, so it must be
+   * dark enough for that; a link sits on the page ground, so in dark mode it must be light enough
+   * for that. Notion's own #2383e2 button is 3.9:1 against its white label — under AA — so the
+   * fill is the same hue taken a step deeper, and the link keeps Notion's brighter tone.
+   */
+  --accent: #1d72c9;            /* fill: 4.9:1 with white */
+  --accent-ink: #ffffff;
+  --accent-hover: #1a68b8;
+  --accent-text: #1a68b8;       /* links: 5.7:1 on white */
+  --accent-soft: rgba(35, 131, 226, 0.14);
+  --good: #0f7b6c;
+  --good-soft: rgba(15, 123, 108, 0.12);
+  --bad: #e03e3e;
+  --bad-soft: rgba(224, 62, 62, 0.11);
+  --bubble: #f1f1ef;
 
-  --r-panel: 10px;
-  --r: 6px;
-  --r-sm: 4px;
+  --r: 3px;        /* controls */
+  --r-2: 5px;      /* containers */
+  --r-panel: 8px;  /* the window itself */
 
-  --t: 110ms cubic-bezier(.2, 0, .2, 1);
+  --shadow: rgba(15, 15, 15, 0.05) 0 0 0 1px, rgba(15, 15, 15, 0.1) 0 3px 6px, rgba(15, 15, 15, 0.2) 0 9px 24px;
+
+  --t: 20ms ease-in;   /* Notion's transitions are nearly instant */
 
   color-scheme: light dark;
 }
 
-/*
- * Three appearance states. "System" stamps no attribute and follows the OS, so the very first
- * paint is already correct — the renderer cannot set an attribute before the stylesheet applies,
- * and the content security policy rules out the usual inline head script. The two explicit
- * choices then have to beat the OS in *both* directions, which is what the :not() buys: the
- * media block stands down when the user has forced light, and the attribute block below adds
- * dark when the OS did not.
- *
- * The two dark blocks are necessarily identical; a test asserts they stay that way.
- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #16161a;
-    --paper-2: #202024;
-    --ink: #ececeb;
-    --ink-2: #a1a1a0;
-    --ink-3: #78787a;
-    --line: #2c2c31;
-    --line-2: #41414a;
-    --solid: #f2f2f0;
-    --solid-fg: #16161a;
-    --accent: #7ba4ff;
-    --accent-soft: #1d2740;
-    --good: #5fcf95;
-    --good-soft: #16301f;
-    --bad: #f08279;
-    --bad-soft: #33191a;
-    --user-bubble: #26262c;
+    --ink: rgba(255, 255, 255, 0.81);
+    --ink-2: rgba(255, 255, 255, 0.46);
+    --ink-3: rgba(255, 255, 255, 0.34);
+    --paper: #191919;
+    --paper-2: #202020;
+    --line: rgba(255, 255, 255, 0.094);
+    --line-2: rgba(255, 255, 255, 0.18);
+    --wash: rgba(255, 255, 255, 0.055);
+    --wash-2: rgba(255, 255, 255, 0.1);
+    --accent: #1d72c9;
+    --accent-ink: #ffffff;
+    --accent-hover: #2a82dd;
+    --accent-text: #529cca;     /* 5.8:1 on #191919 */
+    --accent-soft: rgba(82, 156, 202, 0.2);
+    --good: #4dab9a;
+    --good-soft: rgba(77, 171, 154, 0.16);
+    --bad: #ff7369;
+    --bad-soft: rgba(255, 115, 105, 0.14);
+    --bubble: #2f2f2f;
+    --shadow: rgba(15, 15, 15, 0.1) 0 0 0 1px, rgba(15, 15, 15, 0.2) 0 3px 6px, rgba(15, 15, 15, 0.4) 0 9px 24px;
   }
 }
 
 :root[data-theme="dark"] {
-    --paper: #16161a;
-    --paper-2: #202024;
-    --ink: #ececeb;
-    --ink-2: #a1a1a0;
-    --ink-3: #78787a;
-    --line: #2c2c31;
-    --line-2: #41414a;
-    --solid: #f2f2f0;
-    --solid-fg: #16161a;
-    --accent: #7ba4ff;
-    --accent-soft: #1d2740;
-    --good: #5fcf95;
-    --good-soft: #16301f;
-    --bad: #f08279;
-    --bad-soft: #33191a;
-    --user-bubble: #26262c;
-  /* Native controls — scrollbars, form widgets, the caret — follow the choice, not the OS. */
+  --ink: rgba(255, 255, 255, 0.81);
+  --ink-2: rgba(255, 255, 255, 0.46);
+  --ink-3: rgba(255, 255, 255, 0.34);
+  --paper: #191919;
+  --paper-2: #202020;
+  --line: rgba(255, 255, 255, 0.094);
+  --line-2: rgba(255, 255, 255, 0.18);
+  --wash: rgba(255, 255, 255, 0.055);
+  --wash-2: rgba(255, 255, 255, 0.1);
+  --accent: #1d72c9;
+  --accent-ink: #ffffff;
+  --accent-hover: #2a82dd;
+  --accent-text: #529cca;
+  --accent-soft: rgba(82, 156, 202, 0.2);
+  --good: #4dab9a;
+  --good-soft: rgba(77, 171, 154, 0.16);
+  --bad: #ff7369;
+  --bad-soft: rgba(255, 115, 105, 0.14);
+  --bubble: #2f2f2f;
+  --shadow: rgba(15, 15, 15, 0.1) 0 0 0 1px, rgba(15, 15, 15, 0.2) 0 3px 6px, rgba(15, 15, 15, 0.4) 0 9px 24px;
   color-scheme: dark;
 }
 
@@ -105,12 +117,12 @@
 
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
-  font-size: 13px; line-height: 1.5; letter-spacing: -.006em; color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px; line-height: 1.5; letter-spacing: 0; color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
-a { color: var(--accent); text-underline-offset: 2px; }
+a { color: var(--accent-text); text-underline-offset: 2px; }
 
 /* ---------- Collapsed pill ---------- */
 /*
@@ -121,9 +133,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
  * simply not draggable. Move the window by its panel header instead.
  */
 .pill {
-  position: absolute; inset: 8px; border-radius: 12px; border: none;
-  background: var(--solid); color: var(--solid-fg); font-size: 19px; line-height: 1;
-  box-shadow: 0 1px 2px rgba(0,0,0,.16), 0 6px 16px rgba(0,0,0,.18);
+  position: absolute; inset: 8px; border-radius: 8px; border: none;
+  background: var(--accent); color: var(--accent-ink); font-size: 19px; line-height: 1;
+  box-shadow: var(--shadow);
   -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
   transition: transform var(--t);
 }
@@ -135,7 +147,7 @@ body.collapsed .panel { display: none; }
 /* ---------- Panel ---------- */
 .panel {
   position: absolute; inset: 0; background: var(--paper); border: 1px solid var(--line);
-  border-radius: var(--r-panel); box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 30px rgba(0,0,0,.14);
+  border-radius: var(--r-panel); box-shadow: var(--shadow);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .header {
@@ -145,18 +157,18 @@ body.collapsed .panel { display: none; }
 .header button { -webkit-app-region: no-drag; }
 .title { font-weight: 600; font-size: 13px; letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; }
 /* A square mark reads sharper than a dot and echoes the radius scale. */
-.dot { width: 7px; height: 7px; border-radius: 2px; background: var(--solid); display: inline-block; }
+.dot { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
 .model {
   color: var(--ink-3); font-size: 11px; flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .icon-btn {
-  background: none; border: none; border-radius: var(--r-sm); width: 26px; height: 26px;
+  background: none; border: none; border-radius: var(--r-2); width: 26px; height: 26px;
   color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center;
   font-size: 14px; transition: background var(--t), color var(--t);
 }
-.icon-btn:hover { background: var(--paper-2); color: var(--ink); }
-.icon-btn:active { background: var(--line); }
+.icon-btn:hover { background: var(--wash); color: var(--ink); }
+.icon-btn:active { background: var(--wash-2); }
 
 /*
  * Tooltips. The native `title` takes about a second to appear and is drawn by the OS in a style
@@ -171,8 +183,8 @@ body.collapsed .panel { display: none; }
 [data-tip]::after {
   content: attr(data-tip);
   position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-  padding: 3px 7px; border-radius: var(--r-sm); white-space: nowrap;
-  background: var(--solid); color: var(--solid-fg); font-size: 11px; font-weight: 500;
+  padding: 3px 7px; border-radius: var(--r-2); white-space: nowrap;
+  background: #2f2f2f; color: rgba(255,255,255,.9); font-size: 12px; font-weight: 400;
   letter-spacing: 0; pointer-events: none; opacity: 0; transition: opacity 90ms ease 40ms;
   z-index: 5;
 }
@@ -196,8 +208,8 @@ body.collapsed .panel { display: none; }
 .empty strong { display: block; color: var(--ink); font-size: 14px; letter-spacing: -.015em; margin-bottom: 3px; }
 .msg { line-height: 1.55; word-wrap: break-word; }
 .msg.user {
-  align-self: flex-end; max-width: 88%; background: var(--user-bubble);
-  padding: 7px 11px; border-radius: var(--r); white-space: pre-wrap;
+  align-self: flex-end; max-width: 88%; background: var(--bubble);
+  padding: 7px 11px; border-radius: var(--r-2); white-space: pre-wrap;
 }
 .msg.assistant .body p { margin: 0 0 9px; }
 .msg.assistant .body p:last-child { margin-bottom: 0; }
@@ -208,11 +220,11 @@ body.collapsed .panel { display: none; }
 .msg.assistant .body ul, .msg.assistant .body ol { margin: 5px 0 9px; padding-left: 20px; }
 .msg.assistant .body li { margin: 2px 0; }
 .msg.assistant .body code {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
   padding: .5px 4px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .msg.assistant .body pre {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
   padding: 10px 11px; overflow-x: auto; font-size: 12px;
 }
 .msg.assistant .body pre code { background: none; border: none; padding: 0; }
@@ -225,7 +237,7 @@ body.collapsed .panel { display: none; }
 .tools { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; }
 .tool {
   font-size: 11.5px; color: var(--ink-2); background: var(--paper-2);
-  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px 8px;
+  border: 1px solid var(--line); border-radius: var(--r-2); padding: 3px 8px;
   display: flex; gap: 7px; align-items: baseline;
 }
 .tool .name {
@@ -242,17 +254,17 @@ body.collapsed .panel { display: none; }
 
 /* ---------- Controls ---------- */
 .chip {
-  border: 1px solid var(--line); background: var(--paper); border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--paper); border-radius: var(--r-2);
   padding: 3px 9px; font-size: 12px; color: var(--ink-2);
   transition: background var(--t), color var(--t), border-color var(--t);
 }
-.chip:hover { background: var(--paper-2); border-color: var(--line-2); color: var(--ink); }
+.chip:hover { background: var(--wash); border-color: var(--line-2); color: var(--ink); }
 /* The suggestions read as a deliberate row rather than loose buttons with a label that costs
  * one line. QUICK_ACTIONS is populated once and never cleared, so the label cannot outlive it. */
 .quick { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
 .quick::before {
-  flex-basis: 100%; content: "Try"; font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); margin-bottom: 1px;
+  flex-basis: 100%; content: "Try"; font-size: 12px; font-weight: 500;
+  color: var(--ink-3); margin-bottom: 2px;
 }
 .composer {
   display: flex; gap: 7px; padding: 10px 14px 12px; border-top: 1px solid var(--line);
@@ -260,34 +272,34 @@ body.collapsed .panel { display: none; }
 }
 .composer textarea {
   flex: 1; resize: none; min-height: 34px; max-height: 160px; padding: 7px 9px;
-  border-radius: var(--r); border: 1px solid var(--line); background: var(--paper);
+  border-radius: var(--r-2); border: 1px solid var(--line); background: var(--paper);
   color: var(--ink); font: inherit; letter-spacing: inherit; line-height: 1.45; outline: none;
   transition: border-color var(--t), box-shadow var(--t);
 }
 .composer textarea::placeholder { color: var(--ink-3); }
-.composer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.composer textarea:focus { border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft); }
 .send {
-  background: var(--solid); color: var(--solid-fg); border: none; border-radius: var(--r);
+  background: var(--accent); color: var(--accent-ink); border: none; border-radius: var(--r-2);
   height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 550;
-  transition: opacity var(--t);
+  transition: background var(--t);
 }
-.send:hover { opacity: .86; }
-.send:active { opacity: .74; }
+.send:hover { background: var(--accent-hover); }
+.send:active { filter: brightness(.92); }
 .send.stop { background: var(--bad); }
 .hint { font-size: 11px; color: var(--ink-3); padding: 0 14px 9px; }
 
 /* ---------- Banner ---------- */
 .banner {
   display: flex; align-items: center; gap: 10px; margin: 10px 14px 0; padding: 8px 10px;
-  border: 1px solid var(--line); border-left: 2px solid var(--bad); border-radius: var(--r-sm);
+  border: 1px solid var(--line); border-left: 2px solid var(--bad); border-radius: var(--r-2);
   background: var(--paper-2); font-size: 12px;
 }
 .banner span { flex: 1; }
 .banner-btn {
-  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r-sm);
+  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r-2);
   padding: 3px 8px; font-size: 11.5px; white-space: nowrap; transition: background var(--t);
 }
-.banner-btn:hover { background: var(--paper-2); }
+.banner-btn:hover { background: var(--wash); }
 
 /* ---------- Scrolling views (setup, help) ---------- */
 /*
@@ -301,8 +313,8 @@ body.collapsed .panel { display: none; }
 /* A tracked-out micro-label instead of a large heading: the panel is 400px wide, and a 24px
  * title would spend a tenth of the window announcing which screen you are already looking at. */
 .view-head h1 {
-  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em;
-  color: var(--ink-3); margin: 0 0 5px;
+  font-size: 12px; font-weight: 500; letter-spacing: 0;
+  color: var(--ink-3); margin: 0 0 6px;
 }
 .view.scroll .view-head p { margin: 0; color: var(--ink); font-size: 13px; }
 .view.scroll p { margin: 5px 0 9px; }
@@ -312,17 +324,17 @@ body.collapsed .panel { display: none; }
   display: block; font-weight: 550; margin: 11px 0 3px; font-size: 12px; color: var(--ink);
 }
 .view.scroll input[type="text"], .view.scroll input[type="password"], .view.scroll textarea {
-  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r);
+  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r-2);
   border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
   background: var(--paper); color: var(--ink); outline: none;
   transition: border-color var(--t), box-shadow var(--t);
 }
 .view.scroll input[type="text"]:focus, .view.scroll input[type="password"]:focus,
 .view.scroll textarea:focus, .view.scroll select:focus {
-  border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .view.scroll select {
-  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r);
+  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r-2);
   border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
   background: var(--paper); color: var(--ink); outline: none;
   transition: border-color var(--t), box-shadow var(--t);
@@ -330,13 +342,13 @@ body.collapsed .panel { display: none; }
 .view.scroll label.checkbox {
   display: flex; align-items: flex-start; gap: 8px; font-weight: 400; color: var(--ink-2);
 }
-.view.scroll label.checkbox input { width: auto; margin: 1px 0 0; accent-color: var(--solid); }
+.view.scroll label.checkbox input { width: auto; margin: 1px 0 0; accent-color: var(--accent); }
 #follow-note { margin-top: 3px; }
 #theme-note { margin-top: 4px; }
 
 /* Segmented control: one bordered track, the chosen segment filled solid. */
 .segmented {
-  display: inline-flex; border: 1px solid var(--line); border-radius: var(--r);
+  display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-2);
   overflow: hidden; background: var(--paper);
 }
 .seg {
@@ -345,9 +357,9 @@ body.collapsed .panel { display: none; }
   transition: background var(--t), color var(--t);
 }
 .seg:first-child { border-left: none; }
-.seg:hover { background: var(--paper-2); color: var(--ink); }
-.seg.active { background: var(--solid); color: var(--solid-fg); }
-.seg.active:hover { background: var(--solid); }
+.seg:hover { background: var(--wash); color: var(--ink); }
+.seg.active { background: var(--wash-2); color: var(--ink); font-weight: 500; }
+.seg.active:hover { background: var(--wash-2); }
 
 /* ---------- Setup steps ---------- */
 /*
@@ -356,14 +368,14 @@ body.collapsed .panel { display: none; }
  * is denser and puts the statuses in one column you can scan.
  */
 .step { border: 1px solid var(--line); border-top: none; background: var(--paper); }
-.step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; }
-.step:last-of-type { border-radius: 0 0 var(--r) var(--r); }
+.step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r-2) var(--r-2) 0 0; }
+.step:last-of-type { border-radius: 0 0 var(--r-2) var(--r-2); }
 .step-head {
   display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 11px;
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
   transition: background var(--t);
 }
-.step-head:hover { background: var(--paper-2); }
+.step-head:hover { background: var(--wash); }
 .step-title { font-weight: 550; font-size: 12.5px; }
 .step-note {
   color: var(--ink-3); font-size: 11.5px; flex: 1; text-align: right;
@@ -371,14 +383,14 @@ body.collapsed .panel { display: none; }
 }
 .chev { color: var(--ink-3); font-size: 13px; transition: transform var(--t); }
 .step.open .chev { transform: rotate(90deg); }
-.step.open .step-head { background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.step.open .step-head { background: transparent; border-bottom: 1px solid var(--line); }
 .step-body { display: none; padding: 2px 11px 13px; }
 .step.open .step-body { display: block; }
 .step-body > p:first-child { margin-top: 9px; }
 
 /* Status: a small tinted square, not a solid circle. Scans as a column of states. */
 .step-badge {
-  width: 17px; height: 17px; border-radius: var(--r-sm); flex: none;
+  width: 17px; height: 17px; border-radius: var(--r); flex: none;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 10.5px; font-weight: 700; line-height: 1;
   background: var(--paper-2); color: var(--ink-3); border: 1px solid var(--line);
@@ -389,8 +401,8 @@ body.collapsed .panel { display: none; }
 
 .row { display: flex; flex-direction: column; gap: 7px; margin: 11px 0; }
 .radio { display: flex; align-items: center; gap: 7px; }
-.radio input { accent-color: var(--solid); margin: 0; }
-.status-card { border: 1px solid var(--line); border-radius: var(--r); padding: 9px 10px; margin-top: 11px; }
+.radio input { accent-color: var(--accent); margin: 0; }
+.status-card { border: 1px solid var(--line); border-radius: var(--r-2); padding: 9px 10px; margin-top: 11px; }
 .status-line { display: flex; gap: 7px; align-items: baseline; font-size: 12px; color: var(--ink-2); }
 .status-line.ok { color: var(--good); }
 .status-line.bad { color: var(--bad); }
@@ -400,7 +412,7 @@ body.collapsed .panel { display: none; }
 .advanced summary:hover { color: var(--ink-2); }
 .install-help { margin-top: 9px; }
 .install-help pre {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
   padding: 7px 9px; margin: 5px 0 0; font-size: 11.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-x: auto; user-select: all;
@@ -423,7 +435,7 @@ body.collapsed .panel { display: none; }
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
   font-weight: 550; font-size: 12.5px; transition: color var(--t);
 }
-.faq-q:hover { color: var(--accent); }
+.faq-q:hover { color: var(--accent-text); }
 .faq-q .chev { margin-left: auto; }
 .faq-item.open .chev { transform: rotate(90deg); }
 .faq-item.open .faq-q { color: var(--ink); }
@@ -433,7 +445,7 @@ body.collapsed .panel { display: none; }
 .faq-a p:last-child { margin-bottom: 0; }
 .faq-a strong { color: var(--ink); font-weight: 550; }
 .faq-a code {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
   padding: .5px 4px; font-size: 11.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
 }
@@ -463,8 +475,13 @@ body.collapsed .panel { display: none; }
 }
 .change-note-text { flex: 1; }
 .link-btn {
-  background: none; border: none; padding: 0; font-size: 11.5px; color: var(--accent);
+  background: none; border: none; padding: 0; font-size: 11.5px; color: var(--accent-text);
   text-decoration: underline; text-underline-offset: 2px;
 }
-.looking-at .selected { color: var(--accent); }
+.looking-at .selected { color: var(--accent-text); }
 .looking-at .warn { color: var(--bad); }
+
+/* The version, where you would go looking for it: beside Save, and under the Help heading. */
+.version { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.setup-footer .version { margin-left: auto; }
+.setup-footer .quit { margin-left: 10px; }

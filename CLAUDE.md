@@ -34,7 +34,7 @@ several data sources; resolve with `resolveDataSource` before querying or writin
 
 ```bash
 cd desktop
-npm run check    # typecheck + build + 169 tests
+npm run check    # typecheck + build + 174 tests
 npm run smoke    # renders the built panel in Chromium, both themes  (needs a browser, see below)
 npm start        # run from source
 cd ../extension && npm run check   # 41 tests
@@ -73,12 +73,32 @@ Windows installer.
 **Electron's transparent frameless window** breaks Playwright screenshots of the collapsed pill
 (compositing never settles). Assert computed styles instead; it is a harness quirk, not a bug.
 
+## Visual language
+
+The panel floats beside Notion, so it follows Notion's idiom rather than a generic one:
+
+- warm neutrals. The ink is `#37352f` and the greys are that colour at low alpha, not separate
+  swatches — which is why hover states tint against whatever is behind them.
+- small radii: 3px controls, 5px containers, 8px window. Never round a button to 8px.
+- Notion's three-layer menu shadow (hairline ring plus two spreads), not one soft blur.
+- the system font stack. A bundled typeface reads as foreign next to Notion.
+- two blues, deliberately. `--accent` fills buttons and must carry white text; `--accent-text` is
+  for links and must read against the page. In dark mode those pull opposite ways, so one value
+  cannot serve both — Notion's own `#2383e2` button is 3.9:1 against its white label, under AA.
+
+The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, so a
+palette change that hurts legibility fails rather than ships.
+
 ## Conventions
 
 Commits are authored **and** committed as `Joey Lu <31147609+joeyhlu@users.noreply.github.com>`,
 with no `Co-Authored-By` or session trailers. This checkout's git identity may default to something
 else — set it on the repo before committing and verify with
 `git log -1 --format='%an <%ae> | %cn <%ce>'`.
+
+The version shown in the app is injected by `scripts/build.mjs` from `package.json` via esbuild
+`define` (`__APP_VERSION__`), and the main process uses `app.getVersion()`. Never hard-code it —
+`tests/version.test.ts` fails if the number appears as a literal in the renderer.
 
 Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with a `tag` input.
 Pushing a tag directly returns 403 from the session token. Always confirm the release's **asset

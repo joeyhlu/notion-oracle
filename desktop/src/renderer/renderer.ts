@@ -9,6 +9,9 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 type View = "chat" | "setup" | "help" | "changes" | "history";
 
+/** Baked in by the build from package.json, so it cannot drift from what was released. */
+const VERSION = __APP_VERSION__;
+
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
   "What\u2019s on my calendar this week?",
@@ -645,7 +648,16 @@ async function refreshSetupStatus(): Promise<void> {
  * registered after awaiting settings, a slow or failed round-trip left the button doing nothing
  * while the rest of the window looked fine.
  */
+/** Stamps the version wherever the markup asks for it. */
+function showVersion(): void {
+  for (const slot of document.querySelectorAll<HTMLElement>("[data-version]")) {
+    slot.textContent = `Version ${VERSION}`;
+    slot.title = `Notion Oracle ${VERSION}`;
+  }
+}
+
 function wireControls(): void {
+  showVersion();
   renderEmpty();
   for (const action of QUICK_ACTIONS) {
     const chip = el("button", "chip", action) as HTMLButtonElement;

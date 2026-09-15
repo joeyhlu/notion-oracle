@@ -1,5 +1,9 @@
 import * as esbuild from "esbuild";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+
+// Taken from package.json at build time so the version shown in the app cannot drift from the
+// version that was released. Nothing in the source hard-codes it.
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 const watch = process.argv.includes("--watch");
 const outdir = "dist";
@@ -12,7 +16,10 @@ cpSync("build/tray@2x.png", `${outdir}/tray@2x.png`);
 cpSync("build/icon.png", `${outdir}/icon.png`);
 
 /** @type {import("esbuild").BuildOptions} */
-const common = { bundle: true, sourcemap: watch ? "inline" : false, minify: false, logLevel: "info", target: ["node20"] };
+const common = {
+  bundle: true, sourcemap: watch ? "inline" : false, minify: false, logLevel: "info", target: ["node20"],
+  define: { __APP_VERSION__: JSON.stringify(version) },
+};
 
 const contexts = await Promise.all([
   // Electron main + preload: CommonJS, node platform, electron kept external.

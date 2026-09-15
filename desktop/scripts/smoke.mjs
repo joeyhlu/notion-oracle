@@ -14,6 +14,9 @@
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+
+const { version: pkgVersion } = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"));
 import { join } from "node:path";
 
 const outIndex = process.argv.indexOf("--out");
@@ -298,6 +301,15 @@ for (const ready of [true, false]) {
   check(`${state}: the live reply is drawn`, await page.evaluate(
     () => document.getElementById("messages").innerText.includes("real reply")), true);
   await page.click("#btn-new");
+
+  // The version is baked in from package.json, so a stale hard-coded one cannot ship.
+  await page.click("#btn-help");
+  const shownVersion = await page.locator("#view-help .version").innerText();
+  check(`${state}: version shown in help`, /^Version \d+\.\d+\.\d+$/.test(shownVersion), true);
+  check(`${state}: version matches package.json`, shownVersion, `Version ${pkgVersion}`);
+  await page.click("#btn-settings");
+  check(`${state}: version shown in setup`, await page.locator("#view-setup .version").innerText(), `Version ${pkgVersion}`);
+  await page.click("#btn-settings");
 
   check(`${state}: console clean`, noise, []);
   await page.close();

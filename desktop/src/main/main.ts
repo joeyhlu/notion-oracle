@@ -137,9 +137,12 @@ function createTray(): void {
   const icon = nativeImage.createFromPath(join(__dirname, "../tray.png"));
   icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip("Notion Oracle");
+  tray.setToolTip(`Notion Oracle ${app.getVersion()}`);
   const refreshMenu = () => {
     const menu = Menu.buildFromTemplate([
+      // app.getVersion() reads package.json, the same source the renderer's version is built from.
+      { label: `Notion Oracle ${app.getVersion()}`, enabled: false },
+      { type: "separator" },
       { label: "Open Oracle", click: () => setMode("expanded") },
       {
         label: "Only show over Notion",
