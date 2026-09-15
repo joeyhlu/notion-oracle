@@ -34,7 +34,7 @@ several data sources; resolve with `resolveDataSource` before querying or writin
 
 ```bash
 cd desktop
-npm run check    # typecheck + build + 174 tests
+npm run check    # typecheck + build + 213 tests
 npm run smoke    # renders the built panel in Chromium, both themes  (needs a browser, see below)
 npm start        # run from source
 cd ../extension && npm run check   # 41 tests
@@ -117,6 +117,13 @@ Every mutating Notion or calendar tool must record a reversible entry to the cha
 enough before-state to undo it. Capture that state before the write — Notion keeps no version to
 fall back on.
 
+Calendar edits go through `mcp/calendar-edit.ts` (find by title, plan new times) and
+`mcp/rrule.ts` (repeat rules); both are pure and tested on Linux. The backends only carry out a
+plan. A series is one record from the scripts, dated at its first occurrence, and `expandListing`
+turns it into occurrences for a range; an edit always targets the master, so on a series only
+the time of day may move (see `planTimes`). Both backends print nine-field records: the last
+two are notes and the RFC 5545 rule, and `parseEvents` maps AppleScript's "missing value" to "".
+
 ## Not verified against real hardware
 
 Two features have never executed for real, and the tests only cover the scripts they generate:
@@ -125,6 +132,11 @@ Two features have never executed for real, and the tests only cover the scripts 
   question is whether Notion's Electron view reports `AXSelectedText` at all.
 - **Outlook calendar** (`mcp/win-calendar.ts`) — needs Windows with Outlook installed. No COM call
   has been made.
+
+Three calendar behaviours are likewise script-shape only: the `whose … recurrence contains "FREQ"`
+filter that fetches series which began before a range (it is inside `try`, so if Calendar.app
+rejects it the plain listing still works and series are simply missing), `set recurrence of ev`
+to change or clear a rule, and the Outlook recurrence pattern in `win-calendar.ts`.
 
 Two undo paths are pinned by request shape but unconfirmed against the live API: `unarchiveBlock`
 (`PATCH {archived:false}`) and `restore-page-properties`. A failure in either is visible and

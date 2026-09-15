@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asString, createEventScript, dateStatements, deleteEventScript, describeAppleScriptError, findEventScript, isDateOnly, listCalendarsScript, listEventsScript, parseCalendars, parseEvents, parseIso, pickDefaultCalendar, scoreCalendar, updateEventScript } from "../src/mcp/mac-calendar.ts";
+import { asString, createEventScript, dateStatements, deleteEventScript, describeAppleScriptError, findEventAnywhereScript, findEventScript, isDateOnly, listCalendarsScript, listEventsScript, parseCalendars, parseEvents, parseIso, pickDefaultCalendar, scoreCalendar, updateEventScript } from "../src/mcp/mac-calendar.ts";
 
 // Field/record separators used by the AppleScript output format. Built with fromCharCode
 // (never pasted as literal control characters) to mirror how the module itself builds them.
@@ -327,6 +327,8 @@ test("parseEvents parses multiple records in order", () => {
       end: "2026-09-12T15:00:00",
       allDay: false,
       location: "Room 1",
+      notes: "",
+      recurrence: "",
     },
     {
       uid: "uid-2",
@@ -336,6 +338,8 @@ test("parseEvents parses multiple records in order", () => {
       end: "2026-09-14T00:00:00",
       allDay: true,
       location: "",
+      notes: "",
+      recurrence: "",
     },
   ]);
 });
@@ -357,7 +361,7 @@ test("parseEvents: empty input yields no records", () => {
 
 test("parseEvents: missing trailing fields default to empty strings", () => {
   assert.deepEqual(parseEvents("uid-only"), [
-    { uid: "uid-only", calendar: "", title: "", start: "", end: "", allDay: false, location: "" },
+    { uid: "uid-only", calendar: "", title: "", start: "", end: "", allDay: false, location: "", notes: "", recurrence: "" },
   ]);
 });
 
@@ -416,4 +420,51 @@ test("findEventScript targets one event by uid and returns the list record shape
   assert.match(script, /first event whose uid = "5AF6D260-DA6F"/);
   assert.match(script, /tell calendar "lujoey886@gmail\.com"/);
   assert.ok(script.includes("as «class isot» as string"));
+});
+
+// ---------- repeating events and notes ----------
+
+test("listing fetches series that began before the range, guarded so a failure keeps the plain listing", () => {
+  const script = listEventsScript(new Date(2026, 8, 14), new Date(2026, 8, 21));
+  const plain = script.indexOf("whose start date ≥ d0 and start date < d1");
+  const series = script.indexOf(`whose start date < d0 and recurrence contains "FREQ"`);
+  assert.ok(plain > -1 && series > plain);
+  const guard = script.slice(script.lastIndexOf("try", series), script.indexOf("end try", series));
+  assert.ok(guard.includes("recurrence contains"), "the series query sits inside try/end try");
+  // Every record carries notes and the repeat rule, in that order after location.
+  assert.match(script, /description of ev/);
+  assert.match(script, /recurrence of ev/);
+  assert.match(script, /sep & loc & sep & notes & sep & rr & rec/);
+});
+
+test("a record with nine fields parses notes and the rule; AppleScript's 'missing value' reads as empty", () => {
+  const rec = ["u1", "Work", "Standup", "2026-09-14T09:00:00", "2026-09-14T09:15:00", "false", "", "agenda in doc", "FREQ=WEEKLY;BYDAY=MO"].join(FS);
+  const parsed = parseEvents(rec + RS)[0]!;
+  assert.equal(parsed.notes, "agenda in doc");
+  assert.equal(parsed.recurrence, "FREQ=WEEKLY;BYDAY=MO");
+  const unset = ["u2", "Work", "Once", "2026-09-14T09:00:00", "2026-09-14T09:15:00", "false", "", "missing value", "missing value"].join(FS);
+  assert.deepEqual([parseEvents(unset)[0]!.notes, parseEvents(unset)[0]!.recurrence], ["", ""]);
+});
+
+test("createEventScript writes the repeat rule as the event's recurrence", () => {
+  const script = createEventScript({ title: "Standup", start: "2026-09-14T09:00:00", recurrence: "FREQ=WEEKLY;BYDAY=MO,WE" }, "Work");
+  assert.ok(script.includes(`recurrence:${asString("FREQ=WEEKLY;BYDAY=MO,WE")}`));
+  assert.ok(!createEventScript({ title: "Once", start: "2026-09-14T09:00:00" }, "Work").includes("recurrence:"));
+});
+
+test("updateEventScript can set or clear the rule and flip all-day", () => {
+  const set = updateEventScript({ uid: "u1", calendar: "Work", recurrence: "FREQ=DAILY" });
+  assert.ok(set.includes(`set recurrence of ev to ${asString("FREQ=DAILY")}`));
+  const clear = updateEventScript({ uid: "u1", calendar: "Work", recurrence: "" });
+  assert.ok(clear.includes(`set recurrence of ev to ""`));
+  assert.ok(updateEventScript({ uid: "u1", calendar: "Work", allDay: true }).includes("set allday event of ev to true"));
+  assert.ok(updateEventScript({ uid: "u1", calendar: "Work", allDay: false }).includes("set allday event of ev to false"));
+});
+
+test("findEventAnywhereScript tries each calendar and stops at the first hit", () => {
+  const script = findEventAnywhereScript("5AF6D260-DA6F");
+  assert.match(script, /repeat with c in every calendar/);
+  assert.match(script, /first event of c whose uid = "5AF6D260-DA6F"/);
+  assert.match(script, /exit repeat/);
+  assert.ok(script.indexOf("try") < script.indexOf("first event of c"), "a calendar without the event must not abort the loop");
 });

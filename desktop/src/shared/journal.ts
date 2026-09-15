@@ -48,7 +48,9 @@ export type UndoStep =
   /** A calendar event Oracle created: delete it. */
   | { type: "delete-event"; uid: string; calendar: string }
   /** A calendar event Oracle changed or removed: write the old fields back. */
-  | { type: "restore-event"; uid: string; calendar: string; fields: Record<string, unknown> };
+  | { type: "restore-event"; uid: string; calendar: string; fields: Record<string, unknown> }
+  /** A calendar event Oracle moved to another calendar: move it back where it was. */
+  | { type: "move-event-back"; uid: string; calendar: string; toCalendar: string };
 
 /** "3 blocks", "1 block" — used in labels and in the after-a-turn summary. */
 export function plural(count: number, noun: string): string {

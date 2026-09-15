@@ -139,3 +139,43 @@ test("tools/call rejects an unknown tool name", async () => {
   const reply = repliesById(lines).get(1)!;
   assert.match(reply.error!.message, /Unknown tool/);
 });
+
+// ---------- editing by name ----------
+
+// These run through the executor directly: on Linux the system-calendar tools are not listed,
+// but the request checks that happen before any backend is touched are the same everywhere.
+
+test("an edit has to say which event: uid or words from the title", async () => {
+  const result = await execute("calendar_update_event", { start: "2026-09-18T15:00:00" });
+  assert.equal(result.ok, false);
+  assert.match(result.content, /pass match .*or uid/i);
+  const del = await execute("calendar_delete_event", {});
+  assert.equal(del.ok, false);
+  assert.match(del.content, /pass match/i);
+});
+
+test("a find needs a query", async () => {
+  const result = await execute("calendar_find_events", {});
+  assert.equal(result.ok, false);
+  assert.match(result.content, /query/);
+});
+
+test("a repeat the tool cannot read is refused before anything is written", async () => {
+  const result = await execute("calendar_create_event", { title: "Yoga", start: "2026-09-18T07:00:00", repeat: "whenever" });
+  assert.equal(result.ok, false);
+  assert.match(result.content, /Could not read the repeat/);
+});
+
+test("the editing tools describe the one-step path and the repeat option", () => {
+  const byName = Object.fromEntries(CALENDAR_TOOLS.map((t) => [t.name, t]));
+  if (!byName.calendar_update_event) return; // Linux: the system tools are not exposed
+  const update = byName.calendar_update_event!;
+  const props = update.input_schema.properties as Record<string, unknown>;
+  for (const key of ["match", "on", "uid", "start", "shift_minutes", "duration_minutes", "repeat", "repeat_until", "repeat_count", "show"]) assert.ok(key in props, key);
+  assert.equal((update.input_schema as { required?: string[] }).required, undefined, "nothing is required: match or uid is checked at run time");
+  assert.match(update.description, /keeps the event's length/);
+  assert.ok("match" in (byName.calendar_delete_event!.input_schema.properties as object));
+  assert.ok("match" in (byName.calendar_move_event!.input_schema.properties as object));
+  assert.ok("repeat" in (byName.calendar_create_event!.input_schema.properties as object));
+  assert.ok(byName.calendar_find_events, "find by name is exposed");
+});

@@ -12,32 +12,20 @@
  */
 
 import { execFile } from "node:child_process";
-import { FIELD_SEP, RECORD_SEP, parseCalendars, parseEvents, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
+import { isDateOnly, parseCalendars, parseEvents, parseIso, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
+import { expandListing } from "./calendar-edit.ts";
 
 // Re-exported so existing callers and tests keep importing them from here.
-export { parseCalendars, parseEvents };
+export { isDateOnly, parseCalendars, parseEvents, parseIso };
 export type { CalendarEvent, CalendarInfo, CreateEventInput, UpdateEventInput };
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-
-/** Field and record separators: control characters that cannot appear in calendar text. */
 
 // ---------- escaping and dates ----------
 
 /** Escapes a string into an AppleScript double-quoted literal. */
 export function asString(text: string): string {
   return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-export function isDateOnly(iso: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(iso.trim());
-}
-
-export function parseIso(iso: string, label: string): Date {
-  const trimmed = iso.trim();
-  const date = new Date(isDateOnly(trimmed) ? `${trimmed}T00:00:00` : trimmed);
-  if (Number.isNaN(date.getTime())) throw new Error(`Could not parse ${label} "${iso}". Use ISO 8601, e.g. 2026-09-12T14:00:00, or 2026-09-12 for all day.`);
-  return date;
 }
 
 /**
@@ -83,6 +71,29 @@ export function listCalendarsScript(): string {
   ].join("\n");
 }
 
+/**
+ * Lines that append one event's record to `out`. `calendarExpr` is the AppleScript expression
+ * for the calendar's name. Location, notes and the repeat rule are read inside `try` because
+ * an unset property raises rather than returning empty.
+ */
+function recordLines(calendarExpr: string): string[] {
+  return [
+    `set loc to ""`,
+    `try`,
+    `  set loc to (location of ev) as string`,
+    `end try`,
+    `set notes to ""`,
+    `try`,
+    `  set notes to (description of ev) as string`,
+    `end try`,
+    `set rr to ""`,
+    `try`,
+    `  set rr to (recurrence of ev) as string`,
+    `end try`,
+    `set out to out & (uid of ev) & sep & ${calendarExpr} & sep & (summary of ev) & sep & ${isoOf("start date of ev")} & sep & ${isoOf("end date of ev")} & sep & ((allday event of ev) as string) & sep & loc & sep & notes & sep & rr & rec`,
+  ];
+}
+
 export function listEventsScript(from: Date, to: Date, calendar?: string): string {
   const target = calendar ? `calendar ${asString(calendar)}` : `every calendar`;
   return [
@@ -96,12 +107,18 @@ export function listEventsScript(from: Date, to: Date, calendar?: string): strin
     // Filtering with `whose` inside one calendar is far faster than scanning every event.
     `    set evs to (every event of c whose start date ≥ d0 and start date < d1)`,
     `    repeat with ev in evs`,
-    `      set loc to ""`,
-    `      try`,
-    `        set loc to (location of ev) as string`,
-    `      end try`,
-    `      set out to out & (uid of ev) & sep & (name of c) & sep & (summary of ev) & sep & ${isoOf("start date of ev")} & sep & ${isoOf("end date of ev")} & sep & ((allday event of ev) as string) & sep & loc & rec`,
+    ...recordLines("(name of c)").map((l) => `      ${l}`),
     `    end repeat`,
+    // A series is stored once, dated at its first occurrence, so a weekly standup created in
+    // January is not in `evs` for a week in September. Repeating events that began before the
+    // range are fetched too and expanded into occurrences by the caller. Inside `try` because
+    // a calendar with no recurrence data can make the filter itself fail.
+    `    try`,
+    `      set rs to (every event of c whose start date < d0 and recurrence contains "FREQ")`,
+    `      repeat with ev in rs`,
+    ...recordLines("(name of c)").map((l) => `        ${l}`),
+    `      end repeat`,
+    `    end try`,
     `  end repeat`,
     `end tell`,
     `return out`,
@@ -125,6 +142,7 @@ export function createEventScript(input: CreateEventInput, calendarName: string)
   if (allDay) props.push(`allday event:true`);
   if (input.location) props.push(`location:${asString(input.location)}`);
   if (input.notes) props.push(`description:${asString(input.notes)}`);
+  if (input.recurrence) props.push(`recurrence:${asString(input.recurrence)}`);
 
   return [
     ...dateStatements("s", start),
@@ -149,9 +167,11 @@ export function updateEventScript(input: UpdateEventInput): string {
   if (input.title !== undefined) sets.push(`set summary of ev to ${asString(input.title)}`);
   if (input.start) sets.push(`set start date of ev to s`);
   if (input.end) sets.push(`set end date of ev to e`);
+  if (input.allDay !== undefined) sets.push(`set allday event of ev to ${input.allDay ? "true" : "false"}`);
   if (input.location !== undefined) sets.push(`set location of ev to ${asString(input.location)}`);
   if (input.notes !== undefined) sets.push(`set description of ev to ${asString(input.notes)}`);
-  if (!sets.length) throw new Error("Nothing to change: pass at least one of title, start, end, location or notes.");
+  if (input.recurrence !== undefined) sets.push(`set recurrence of ev to ${asString(input.recurrence)}`);
+  if (!sets.length) throw new Error("Nothing to change: pass at least one of title, start, end, location, notes or repeat.");
 
   return [
     ...lines,
@@ -175,12 +195,30 @@ export function findEventScript(uid: string, calendar: string): string {
     `tell application "Calendar"`,
     `  tell calendar ${asString(calendar)}`,
     `    set ev to first event whose uid = ${asString(uid)}`,
-    `    set loc to ""`,
-    `    try`,
-    `      set loc to (location of ev) as string`,
-    `    end try`,
-    `    set out to (uid of ev) & sep & ${asString(calendar)} & sep & (summary of ev) & sep & ${isoOf("start date of ev")} & sep & ${isoOf("end date of ev")} & sep & ((allday event of ev) as string) & sep & loc & rec`,
+    ...recordLines(asString(calendar)).map((l) => `    ${l}`),
     `  end tell`,
+    `end tell`,
+    `return out`,
+  ].join("\n");
+}
+
+/**
+ * One event by uid when the calendar is not known: each calendar is tried in turn. A uid is
+ * unique across the account, so the first hit is the event.
+ */
+export function findEventAnywhereScript(uid: string): string {
+  return [
+    `set out to ""`,
+    `set sep to (character id 31)`,
+    `set rec to (character id 30)`,
+    `tell application "Calendar"`,
+    `  repeat with c in every calendar`,
+    `    try`,
+    `      set ev to first event of c whose uid = ${asString(uid)}`,
+    ...recordLines("(name of c)").map((l) => `      ${l}`),
+    `      exit repeat`,
+    `    end try`,
+    `  end repeat`,
     `end tell`,
     `return out`,
   ].join("\n");
@@ -319,7 +357,7 @@ export async function listEvents(from: string, to: string, calendar?: string): P
   const end = parseIso(to, "to");
   const name = calendar ? await resolveCalendar(calendar) : undefined;
   const events = parseEvents(await runAppleScript(listEventsScript(start, end, name)));
-  return events.sort((a, b) => a.start.localeCompare(b.start));
+  return expandListing(events, start, end);
 }
 
 export async function createEvent(input: CreateEventInput): Promise<{ uid: string; calendar: string }> {
@@ -335,15 +373,17 @@ export async function updateEvent(input: UpdateEventInput): Promise<void> {
   await runAppleScript(updateEventScript({ ...input, calendar: await resolveCalendar(input.calendar) }));
 }
 
+/** One event by uid; the whole account is searched when the calendar is not given. */
+export async function findEvent(uid: string, calendar?: string): Promise<CalendarEvent | null> {
+  assertMac();
+  const script = calendar ? findEventScript(uid, await resolveCalendar(calendar)) : findEventAnywhereScript(uid);
+  return parseEvents(await runAppleScript(script))[0] ?? null;
+}
+
 /**
  * Moves an event between calendars. AppleScript cannot reassign an event's calendar, so this
  * copies it across and deletes the original - which means a new uid.
  */
-export async function findEvent(uid: string, calendar: string): Promise<CalendarEvent | null> {
-  assertMac();
-  return parseEvents(await runAppleScript(findEventScript(uid, await resolveCalendar(calendar))))[0] ?? null;
-}
-
 export async function moveEvent(uid: string, fromCalendar: string, toCalendar: string): Promise<{ uid: string; calendar: string }> {
   assertMac();
   const source = await resolveCalendar(fromCalendar);
@@ -358,6 +398,8 @@ export async function moveEvent(uid: string, fromCalendar: string, toCalendar: s
     allDay: found.allDay,
     calendar: target,
     location: found.location || undefined,
+    notes: found.notes || undefined,
+    recurrence: found.recurrence || undefined,
   });
   // Only remove the original once the copy exists, so a failure cannot lose the event.
   await deleteEvent(uid, source);

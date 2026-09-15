@@ -11,6 +11,9 @@ import * as win from "./win-calendar.ts";
 import { CALENDAR_TOOL_NAMES } from "./calendar-tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
 import { appendChange } from "../shared/journal-file.ts";
+import { dayOf, parseIso, type CalendarEvent } from "./calendar-record.ts";
+import { chooseTarget, dayWindow, defaultWindow, describeWhen, planTimes, rankMatches, SEARCH_DAYS_AHEAD, SEARCH_DAYS_BACK } from "./calendar-edit.ts";
+import { describeRRule, toRRule } from "./rrule.ts";
 
 const DEFAULT_STRATEGY: Strategy = process.env.CALENDAR_STRATEGY === "command-bar" ? "command-bar" : "new-event-key";
 const AUTO_SAVE = process.env.CALENDAR_AUTO_SAVE === "1";
@@ -42,7 +45,7 @@ const backend = process.platform === "win32"
       createEvent: async (input: mac.CreateEventInput) => win.createEvent({ ...input, calendar: await win.resolveCalendar(input.calendar, mac.readDefaultCalendar()) }),
       updateEvent: (input: mac.UpdateEventInput) => win.updateEvent(input),
       deleteEvent: (uid: string) => win.deleteEvent(uid),
-      findEvent: (uid: string) => win.findEvent(uid),
+      findEvent: (uid: string, _calendar?: string) => win.findEvent(uid),
       moveEvent: (uid: string, _from: string, to: string) => win.moveEvent(uid, to),
       resolveCalendar: (requested?: string) => win.resolveCalendar(requested, mac.readDefaultCalendar()),
     }
@@ -53,10 +56,28 @@ const backend = process.platform === "win32"
       createEvent: (input: mac.CreateEventInput) => mac.createEvent(input),
       updateEvent: (input: mac.UpdateEventInput) => mac.updateEvent(input),
       deleteEvent: (uid: string, calendar: string) => mac.deleteEvent(uid, calendar),
-      findEvent: (uid: string, calendar: string) => mac.findEvent(uid, calendar),
+      findEvent: (uid: string, calendar?: string) => mac.findEvent(uid, calendar),
       moveEvent: (uid: string, from: string, to: string) => mac.moveEvent(uid, from, to),
       resolveCalendar: (requested?: string) => mac.resolveCalendar(requested),
     };
+
+/** Fields shared by the tools that act on an existing event: how to say which one. */
+const TARGET_FIELDS = {
+  match: { type: "string", description: "Words from the event's title, e.g. 'dentist'. Case does not matter. The event is looked for from a week ago to three months ahead; pass `on` to pin the day. If several different events match, the tool lists them and you pass the uid of the right one." },
+  on: { type: "string", description: "The day the event is on, ISO 8601 (2026-09-17), to narrow `match` when the same title recurs or the user said which day." },
+  uid: { type: "string", description: "Event uid from calendar_list_events or calendar_find_events. Use this instead of `match` when you already have it." },
+  calendar: { type: "string", description: "Calendar the event is in. Optional; speeds up a uid lookup, and limits `match` to one calendar." },
+} as const;
+
+const REPEAT_FIELDS = {
+  repeat: { type: "string", description: "Make it a repeating event: 'daily', 'weekly', 'every weekday', 'every 2 weeks', 'monthly', 'yearly', 'every monday and wednesday', 'every other friday', or a raw RRULE (FREQ=WEEKLY;BYDAY=MO). 'never' stops an event repeating." },
+  repeat_until: { type: "string", description: "Last day of the series, ISO 8601 date. Inclusive." },
+  repeat_count: { type: "integer", description: "How many times it happens in total, the first one included." },
+} as const;
+
+const SHOW_FIELD = {
+  show: { type: "boolean", description: `Afterwards, open ${APP_NAME} to that day so the user sees the result. Use it when they are looking at ${APP_NAME} or ask to see it; otherwise leave it off.` },
+} as const;
 
 const SYSTEM_TOOLS: ToolDefinition[] = [
   {
@@ -66,7 +87,7 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
   },
   {
     name: "calendar_list_events",
-    description: "Read the user's real calendar events in a date range. Use this to answer questions like what is on the calendar this week, to find an event before changing it, or to confirm an event was created. Returns each event's uid, which update and delete need.",
+    description: "Everything on the user's real calendar in a date range, repeating events expanded into their occurrences. Use it for 'what's on this week', 'am I free Thursday afternoon', or to confirm a change landed. Each event carries a uid; the editing tools accept that, or just words from the title.",
     input_schema: {
       type: "object",
       properties: {
@@ -79,9 +100,24 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "calendar_find_events",
+    description: `Find events by title: 'when is my dentist appointment', 'do I have anything with Sam coming up'. Looks from ${SEARCH_DAYS_BACK} days ago to ${SEARCH_DAYS_AHEAD} days ahead unless you pass a range, across every calendar, and returns the matches best-first with when each is and whether it repeats. You do not need this before editing — calendar_update_event and the others take the same words directly.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Words from the title. Case does not matter." },
+        from: { type: "string", description: "Start of the range to look in, ISO 8601. Widen it when the default window comes back empty." },
+        to: { type: "string", description: "End of the range, exclusive, ISO 8601." },
+        calendar: { type: "string", description: "Limit to one calendar by name." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "calendar_create_event",
     description:
-      `Create an event in the user's real calendar (their Google, iCloud or Outlook account, via ${BACKEND_NAME}). It syncs to the account and shows up in Notion Calendar. Resolve relative dates yourself from the context block and pass ISO 8601. A bare date makes an all-day event. Confirm the result to the user with the calendar name it landed in.`,
+      `Create an event in the user's real calendar (their Google, iCloud or Outlook account, via ${BACKEND_NAME}). It syncs to the account and shows up in ${APP_NAME}. Resolve relative dates yourself from the context block and pass ISO 8601. A bare date makes an all-day event. Pass repeat for a series. Confirm the result to the user with the calendar name it landed in.`,
     input_schema: {
       type: "object",
       properties: {
@@ -89,11 +125,58 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
         start: { type: "string", description: "ISO 8601 start, e.g. 2026-09-12T14:00:00. A bare date (2026-09-12) makes an all-day event." },
         end: { type: "string", description: "ISO 8601 end. Defaults to one hour after start, or the next day for all-day events." },
         all_day: { type: "boolean" },
-        calendar: { type: "string", description: "Calendar name to add it to. Omit to use the user's first writable calendar." },
+        calendar: { type: "string", description: "Calendar name to add it to. Omit to use the user's default calendar." },
         location: { type: "string" },
         notes: { type: "string" },
+        ...REPEAT_FIELDS,
+        ...SHOW_FIELD,
       },
       required: ["title", "start"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "calendar_update_event",
+    description:
+      "Change an event in one step: say which event (words from its title, or a uid) and what changes. 'Move the dentist to Friday at 3' is match:'dentist', start:'2026-09-18T15:00:00' — a new start keeps the event's length, so do not compute an end unless the length changes. shift_minutes nudges it ('push it back an hour' is 60); duration_minutes changes only how long it is; a bare date makes it all-day and a time makes an all-day event timed. Title, location, notes and repeat can change in the same call. Only the fields you pass are changed. On a repeating event the change applies to the whole series and a time change keeps the series' first date; a single occurrence cannot be edited from here, so tell the user to do that one in the calendar app.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ...TARGET_FIELDS,
+        title: { type: "string" },
+        start: { type: "string", description: "New ISO 8601 start. The end moves with it unless you pass end or duration_minutes." },
+        end: { type: "string", description: "New ISO 8601 end." },
+        shift_minutes: { type: "integer", description: "Move the whole event by this many minutes; negative for earlier. Instead of start." },
+        duration_minutes: { type: "integer", description: "New length in minutes." },
+        all_day: { type: "boolean" },
+        location: { type: "string" },
+        notes: { type: "string" },
+        ...REPEAT_FIELDS,
+        ...SHOW_FIELD,
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "calendar_delete_event",
+    description: "Delete an event: say which one with words from its title or a uid. This is recorded so the user can undo it from the changes list, but confirm with the user before calling it unless they explicitly asked to delete that specific event. A repeating event is deleted as a whole series.",
+    input_schema: {
+      type: "object",
+      properties: { ...TARGET_FIELDS },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "calendar_move_event",
+    description:
+      "Move an existing event to a different calendar, when it landed in the wrong one. Say which event with words from its title or a uid. It is recreated in the target calendar and the original removed, so it gets a new uid, which this returns.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ...TARGET_FIELDS,
+        to_calendar: { type: "string", description: "Calendar to move it to." },
+      },
+      required: ["to_calendar"],
       additionalProperties: false,
     },
   },
@@ -105,52 +188,6 @@ const SYSTEM_TOOLS: ToolDefinition[] = [
       type: "object",
       properties: { calendar: { type: "string", description: "Exact calendar name, from calendar_list_calendars." } },
       required: ["calendar"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "calendar_move_event",
-    description:
-      "Move an existing event to a different calendar. Use this when an event landed in the wrong calendar. It recreates the event in the target calendar and removes the original, so the event gets a new uid, which this returns.",
-    input_schema: {
-      type: "object",
-      properties: {
-        uid: { type: "string", description: "Event uid from calendar_list_events." },
-        from_calendar: { type: "string", description: "Calendar the event is currently in." },
-        to_calendar: { type: "string", description: "Calendar to move it to." },
-      },
-      required: ["uid", "from_calendar", "to_calendar"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "calendar_update_event",
-    description: "Change an existing event: retitle it, move it to another time, or set its location or notes. Find the event with calendar_list_events first to get its uid and calendar. Only the fields you pass are changed.",
-    input_schema: {
-      type: "object",
-      properties: {
-        uid: { type: "string", description: "Event uid from calendar_list_events." },
-        calendar: { type: "string", description: "Name of the calendar the event is in." },
-        title: { type: "string" },
-        start: { type: "string", description: "New ISO 8601 start." },
-        end: { type: "string", description: "New ISO 8601 end." },
-        location: { type: "string" },
-        notes: { type: "string" },
-      },
-      required: ["uid", "calendar"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "calendar_delete_event",
-    description: "Delete an event from the user's calendar. This is not easily undone, so confirm with the user before calling it unless they explicitly asked to delete that specific event. Find the uid with calendar_list_events first.",
-    input_schema: {
-      type: "object",
-      properties: {
-        uid: { type: "string", description: "Event uid from calendar_list_events." },
-        calendar: { type: "string", description: "Name of the calendar the event is in." },
-      },
-      required: ["uid", "calendar"],
       additionalProperties: false,
     },
   },
@@ -251,6 +288,71 @@ const record = (change: Parameters<typeof appendChange>[1]): void => {
   if (journal) appendChange(journal, change);
 };
 
+const str = (value: unknown): string => (value === undefined || value === null ? "" : String(value)).trim();
+const num = (value: unknown): number | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new Error(`Expected a number, got "${String(value)}".`);
+  return n;
+};
+
+/** A listing entry as the model sees it: the record plus a readable time and repeat rule. */
+function present(event: CalendarEvent): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    uid: event.uid,
+    calendar: event.calendar,
+    title: event.title,
+    when: describeWhen(event),
+    start: event.start,
+    end: event.end,
+    all_day: event.allDay,
+  };
+  if (event.location) out.location = event.location;
+  if (event.notes) out.notes = event.notes.length > 300 ? `${event.notes.slice(0, 300)}…` : event.notes;
+  if (event.recurrence) out.repeats = describeRRule(event.recurrence);
+  return out;
+}
+
+/**
+ * The event a request means. A uid is looked up directly; otherwise the title words are
+ * matched over a window (the day in `on`, else a week back to three months ahead) and the
+ * request is refused with the candidates when more than one different event fits.
+ */
+async function locate(input: Record<string, unknown>): Promise<CalendarEvent> {
+  const uid = str(input.uid);
+  const calendar = str(input.calendar) || undefined;
+  if (uid) {
+    const found = await backend.findEvent(uid, calendar);
+    if (!found) throw new Error(`No event with uid "${uid}"${calendar ? ` in "${calendar}"` : ""}. It may have been deleted or moved; find it again with calendar_find_events.`);
+    return found;
+  }
+  const match = str(input.match);
+  if (!match) throw new Error("Say which event: pass match (words from its title) or uid (from a listing).");
+  const on = str(input.on);
+  const window = on ? dayWindow(on) : defaultWindow();
+  const events = await backend.listEvents(window.from.toISOString(), window.to.toISOString(), calendar);
+  const choice = chooseTarget(rankMatches(events, match), match, on ? { on } : {});
+  if (choice.kind === "one") return choice.event;
+  if (choice.kind === "none") {
+    const where = on ? `on ${dayOf(on)}` : `between ${dayOf(window.from.toISOString())} and ${dayOf(window.to.toISOString())}`;
+    throw new Error(`No event matching "${match}" ${where}${calendar ? ` in "${calendar}"` : ""}. Try other words from the title, or calendar_find_events with a wider from/to.`);
+  }
+  const list = choice.candidates.map((c) => `- "${c.title}" — ${describeWhen(c)} (${c.calendar}), uid ${c.uid}`).join("\n");
+  throw new Error(`Several events match "${match}":\n${list}\nPass the uid of the one the user means, or narrow with on (the day).`);
+}
+
+/** Best-effort: showing the day in Notion Calendar is a courtesy, never the reason a change fails. */
+async function showDay(iso: string): Promise<string> {
+  try {
+    await openCalendarDate(parseIso(iso, "start"));
+    return `${APP_NAME} is showing that day.`;
+  } catch (error) {
+    return `Could not open ${APP_NAME}: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+const SYNC_NOTE = `It syncs to the account and appears in ${APP_NAME} within a minute or so.`;
+
 export const execute: ToolExecutor = async (name, input) => {
   try {
     switch (name) {
@@ -269,60 +371,115 @@ export const execute: ToolExecutor = async (name, input) => {
         return ok(await backend.listCalendars());
 
       case "calendar_list_events": {
-        const events = await backend.listEvents(String(input.from ?? ""), String(input.to ?? ""), input.calendar ? String(input.calendar) : undefined);
+        const events = await backend.listEvents(str(input.from), str(input.to), str(input.calendar) || undefined);
         if (!events.length) return ok("No events in that range.");
-        return ok(events);
+        return ok(events.map(present));
+      }
+
+      case "calendar_find_events": {
+        const query = str(input.query);
+        if (!query) throw new Error("Pass query: words from the event's title.");
+        const window = defaultWindow();
+        const from = str(input.from) ? parseIso(str(input.from), "from") : window.from;
+        const to = str(input.to) ? parseIso(str(input.to), "to") : window.to;
+        const events = await backend.listEvents(from.toISOString(), to.toISOString(), str(input.calendar) || undefined);
+        const matches = rankMatches(events, query);
+        const range = `${dayOf(from.toISOString())} to ${dayOf(to.toISOString())}`;
+        if (!matches.length) return ok({ matches: [], searched: range, note: "Nothing with that in the title. Try other words, or pass from/to to look further out." });
+        return ok({ matches: matches.slice(0, 25).map(present), searched: range });
       }
 
       case "calendar_create_event": {
+        const title = str(input.title);
+        const recurrence = input.repeat === undefined ? undefined : toRRule(str(input.repeat), { until: str(input.repeat_until) || undefined, count: num(input.repeat_count) }) || undefined;
         const created = await backend.createEvent({
-          title: String(input.title ?? ""),
-          start: String(input.start ?? ""),
-          end: input.end ? String(input.end) : undefined,
+          title,
+          start: str(input.start),
+          end: str(input.end) || undefined,
           allDay: Boolean(input.all_day),
-          calendar: input.calendar ? String(input.calendar) : undefined,
-          location: input.location ? String(input.location) : undefined,
-          notes: input.notes ? String(input.notes) : undefined,
+          calendar: str(input.calendar) || undefined,
+          location: str(input.location) || undefined,
+          notes: str(input.notes) || undefined,
+          recurrence,
         });
-        record({ tool: "calendar", kind: "event", action: "create", label: `Added "${String(input.title ?? "")}" to ${created.calendar}`, target: created.calendar, undo: { type: "delete-event", uid: created.uid, calendar: created.calendar } });
-        return ok({ created: true, ...created, note: `Added to "${created.calendar}". It syncs to the account and will appear in ${APP_NAME} shortly.` });
+        record({ tool: "calendar", kind: "event", action: "create", label: `Added "${title}" to ${created.calendar}`, target: created.calendar, undo: { type: "delete-event", uid: created.uid, calendar: created.calendar } });
+        const result: Record<string, unknown> = { created: true, ...created, title, start: str(input.start) };
+        if (recurrence) result.repeats = describeRRule(recurrence);
+        result.note = `Added to "${created.calendar}". ${SYNC_NOTE}`;
+        if (input.show) result.shown = await showDay(str(input.start));
+        return ok(result);
       }
 
       case "calendar_set_default_calendar": {
-        const chosen = await setDefault(String(input.calendar ?? ""));
+        const chosen = await setDefault(str(input.calendar));
         return ok({ default_calendar: chosen, note: `New events go to "${chosen}" unless the user names another calendar.` });
       }
 
       case "calendar_move_event": {
-        const moved = await backend.moveEvent(String(input.uid ?? ""), String(input.from_calendar ?? ""), String(input.to_calendar ?? ""));
-        return ok({ moved: true, ...moved, note: "The event was recreated in the target calendar, so its uid changed." });
+        const target = await locate({ ...input, calendar: str(input.calendar) || str(input.from_calendar) });
+        const moved = await backend.moveEvent(target.uid, target.calendar, str(input.to_calendar));
+        record({ tool: "calendar", kind: "event", action: "update", label: `Moved "${target.title}" from ${target.calendar} to ${moved.calendar}`, target: moved.calendar,
+          undo: { type: "move-event-back", uid: moved.uid, calendar: moved.calendar, toCalendar: target.calendar } });
+        return ok({ moved: true, ...moved, title: target.title, note: `Now in "${moved.calendar}". The event was recreated there, so its uid changed. ${SYNC_NOTE}` });
       }
 
       case "calendar_update_event": {
-        // Read the event before changing it; there is no other way back to its old fields.
-        const before = await backend.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
-        await backend.updateEvent({
-          uid: String(input.uid ?? ""),
-          calendar: String(input.calendar ?? ""),
-          title: input.title === undefined ? undefined : String(input.title),
-          start: input.start ? String(input.start) : undefined,
-          end: input.end ? String(input.end) : undefined,
-          location: input.location === undefined ? undefined : String(input.location),
-          notes: input.notes === undefined ? undefined : String(input.notes),
+        const target = await locate(input);
+        // The master record, re-read by uid: for a series that is the first occurrence, which is
+        // what the times are computed against, and it is the before-state the undo writes back.
+        const before = (await backend.findEvent(target.uid, target.calendar)) ?? target;
+        const times = planTimes(before, {
+          start: str(input.start) || undefined,
+          end: str(input.end) || undefined,
+          shiftMinutes: num(input.shift_minutes),
+          durationMinutes: num(input.duration_minutes),
+          allDay: typeof input.all_day === "boolean" ? input.all_day : undefined,
         });
-        record({ tool: "calendar", kind: "event", action: "update", label: `Changed "${before?.title ?? "an event"}"`, target: String(input.calendar ?? ""),
-          undo: before ? { type: "restore-event", uid: String(input.uid ?? ""), calendar: String(input.calendar ?? ""), fields: { ...before } } : undefined });
-        return ok({ updated: true, uid: input.uid });
+        const recurrence = input.repeat === undefined ? undefined : toRRule(str(input.repeat), { until: str(input.repeat_until) || undefined, count: num(input.repeat_count) });
+        const update = {
+          uid: before.uid,
+          calendar: before.calendar,
+          title: input.title === undefined ? undefined : str(input.title),
+          ...times,
+          location: input.location === undefined ? undefined : str(input.location),
+          notes: input.notes === undefined ? undefined : str(input.notes),
+          recurrence: recurrence === before.recurrence ? undefined : recurrence,
+        };
+        delete (update as { note?: string }).note;
+        const changed = Object.entries(update).filter(([k, v]) => v !== undefined && k !== "uid" && k !== "calendar");
+        if (!changed.length) {
+          return ok({ updated: false, uid: before.uid, calendar: before.calendar, title: before.title, when: describeWhen(before), note: "Nothing to change: the event already is as asked." });
+        }
+        await backend.updateEvent(update);
+        record({ tool: "calendar", kind: "event", action: "update", label: `Changed "${before.title}"`, target: before.calendar,
+          undo: { type: "restore-event", uid: before.uid, calendar: before.calendar, fields: { ...before } } });
+        const after = { ...before, ...update, recurrence: update.recurrence ?? before.recurrence, allDay: update.allDay ?? before.allDay };
+        const result: Record<string, unknown> = {
+          updated: true,
+          uid: before.uid,
+          calendar: before.calendar,
+          title: after.title ?? before.title,
+          changed: changed.map(([k]) => k),
+          was: { when: describeWhen(before), start: before.start, end: before.end },
+          now: { when: describeWhen(after), start: after.start, end: after.end },
+        };
+        if (after.recurrence) result.repeats = describeRRule(after.recurrence);
+        else if (before.recurrence) result.repeats = "no longer repeats";
+        if (times.note) result.series_note = times.note;
+        result.note = SYNC_NOTE;
+        if (input.show) result.shown = await showDay(after.start);
+        return ok(result);
       }
 
       case "calendar_delete_event": {
         // Calendar.app has no trash, so the fields are the only copy: capture them or the delete
         // really is final.
-        const doomed = await backend.findEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
-        await backend.deleteEvent(String(input.uid ?? ""), String(input.calendar ?? ""));
-        record({ tool: "calendar", kind: "event", action: "delete", label: `Deleted "${doomed?.title ?? "an event"}"`, target: String(input.calendar ?? ""),
-          undo: doomed ? { type: "restore-event", uid: String(input.uid ?? ""), calendar: String(input.calendar ?? ""), fields: { ...doomed } } : undefined });
-        return ok({ deleted: true, uid: input.uid });
+        const target = await locate(input);
+        const doomed = (await backend.findEvent(target.uid, target.calendar)) ?? target;
+        await backend.deleteEvent(doomed.uid, doomed.calendar);
+        record({ tool: "calendar", kind: "event", action: "delete", label: `Deleted "${doomed.title}"`, target: doomed.calendar,
+          undo: { type: "restore-event", uid: doomed.uid, calendar: doomed.calendar, fields: { ...doomed } } });
+        return ok({ deleted: true, uid: doomed.uid, calendar: doomed.calendar, title: doomed.title, when: describeWhen(doomed), repeated: Boolean(doomed.recurrence), note: "Gone from the calendar; the user can undo it from Oracle's changes list." });
       }
 
       case "calendar_create_event_by_keystrokes": {

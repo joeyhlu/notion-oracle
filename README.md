@@ -70,9 +70,11 @@ This is the on-demand version of Notion AI's always-on AI properties. Oracle has
 
 **In your calendar** — Calendar.app on macOS, Outlook on Windows, so events sync to your phone and to Notion Calendar like any other:
 
-`calendar_list_calendars`, `calendar_list_events`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_move_event`, `calendar_set_default_calendar`
+`calendar_list_calendars`, `calendar_list_events`, `calendar_find_events`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_move_event`, `calendar_set_default_calendar`
 
-New events go to the calendar belonging to your account rather than the empty local one macOS lists first; you can pin a different default by asking ("use my Gmail calendar"), and move a misplaced event with `calendar_move_event`.
+Editing is one step. *"Move the dentist to Friday at 3"*, *"push my 1:1 back an hour"*, *"make Thursday's lunch 90 minutes"*, *"delete the standup on the 24th"*: Oracle finds the event by its title (a week back to three months ahead), keeps its length when only the time moves, and asks which one you mean only when two different events fit the words. Repeating events work too — *"yoga every Tuesday at 7 until December"* creates a series, *"make the standup daily"* or *"stop it repeating"* changes one, and *"what's on Thursday"* includes the weekly standup you created in January. A change to a series applies to every occurrence; a single occurrence is the one thing to do in Notion Calendar itself. Say *"show me"* and Oracle opens Notion Calendar to that day.
+
+New events go to the calendar belonging to your account rather than the empty local one macOS lists first; you can pin a different default by asking ("use my Gmail calendar"), and move a misplaced event with *"move it to my Gmail calendar"*. Every calendar change is in the changes list with an Undo, including moves.
 
 On Windows any account you have added to Outlook works, Google and iCloud included. On Linux, on a PC without Outlook, or if you'd rather drive Notion Calendar directly, Oracle falls back to opening Notion Calendar and typing the event — create-only, no reading or editing.
 

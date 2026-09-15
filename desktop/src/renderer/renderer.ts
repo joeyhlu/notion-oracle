@@ -20,6 +20,7 @@ const VERSION = __APP_VERSION__;
 const QUICK_ACTIONS = [
   "Summarize the page I'm looking at",
   "What\u2019s on my calendar this week?",
+  "Move my dentist appointment to Friday at 3",
   "Turn this page into a to-do list and add it to the end",
   "Create a page under this one with an outline for…",
 ];
@@ -402,6 +403,10 @@ const FAQ: Array<{ q: string; a: string; id?: string }> = [
   {
     q: "My event went to the wrong calendar",
     a: "<p>Say <em>“use my Gmail calendar by default”</em> and Oracle remembers it from then on.</p><p>To fix one that already landed wrong: <em>“move my birthday to my Gmail calendar”</em>.</p><p>Subscribed calendars like holidays are read-only, so Oracle will refuse to write to them rather than putting the event somewhere unexpected.</p>",
+  },
+  {
+    q: "Changing or moving an event",
+    a: "<p>Name it and say what changes: <em>“move the dentist to Friday at 3”</em>, <em>“push my 1:1 back an hour”</em>, <em>“make Thursday’s lunch 90 minutes”</em>, <em>“delete the standup on the 24th”</em>. Oracle finds the event by its title, from a week ago to three months ahead, and keeps its length when only the time moves. If two different events fit the words, it lists them and asks which.</p><p>Repeating events: <em>“yoga every Tuesday at 7 until December”</em> creates a series, <em>“make the standup daily”</em> changes one, <em>“stop the standup repeating”</em> ends it. A change applies to the whole series; to alter a single occurrence, do that one in Notion Calendar.</p><p>Say <em>“show me”</em> and Oracle opens Notion Calendar to the day. Every change is in the changes list (⟲) with an Undo.</p>",
   },
   {
     q: "It says macOS blocked access to Calendar",

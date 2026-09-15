@@ -16,11 +16,14 @@
 
 import { records, parseCalendars, parseEvents, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
 import { runCapture } from "../main/process.ts";
+import { parseRRule, WEEKDAYS, type Rule } from "./rrule.ts";
 
 /** olFolderCalendar. The default calendar of a mail store. */
 const OL_FOLDER_CALENDAR = 9;
 /** olAppointmentItem. */
 const OL_APPOINTMENT = 1;
+/** OlRecurrenceType: daily, weekly, monthly, yearly. (3 and 6 are the "nth weekday" variants.) */
+const OL_RECURS: Record<Rule["freq"], number> = { DAILY: 0, WEEKLY: 1, MONTHLY: 2, YEARLY: 5 };
 
 export function assertWindows(): void {
   if (process.platform !== "win32") throw new Error("The Outlook calendar backend only runs on Windows.");
@@ -104,6 +107,64 @@ function folderLookup(calendar?: string): string {
   ].join("\n");
 }
 
+/**
+ * Lines that print one event as a record, `$item` being the appointment and `$calName` the
+ * calendar it belongs to. The repeat rule is rebuilt as RFC 5545 text from Outlook's pattern
+ * object so both backends describe a series the same way.
+ */
+function eventRecord(): string {
+  return [
+    "$isAllDay = if ($item.AllDayEvent) { 'true' } else { 'false' }",
+    "$rr = ''",
+    "if ($item.IsRecurring) {",
+    "  try {",
+    "    $p = $item.GetRecurrencePattern()",
+    "    $freq = switch ($p.RecurrenceType) { 0 {'DAILY'} 1 {'WEEKLY'} 2 {'MONTHLY'} 3 {'MONTHLY'} 5 {'YEARLY'} 6 {'YEARLY'} default {'DAILY'} }",
+    "    $rr = \"FREQ=$freq\"",
+    "    if ($p.Interval -gt 1) { $rr += \";INTERVAL=$($p.Interval)\" }",
+    "    if ($p.RecurrenceType -eq 1) {",
+    "      $days = @()",
+    ...WEEKDAYS.map((day, i) => `      if ($p.DayOfWeekMask -band ${1 << i}) { $days += '${day}' }`),
+    "      if ($days.Count -gt 0) { $rr += ';BYDAY=' + ($days -join ',') }",
+    "    }",
+    "    if (-not $p.NoEndDate) { $rr += ';UNTIL=' + $p.PatternEndDate.ToString('yyyyMMdd') }",
+    "  } catch { $rr = 'FREQ=DAILY' }",
+    "}",
+    "$notes = ''",
+    "try { $notes = [string]$item.Body } catch { }",
+    emit([
+      "$item.EntryID",
+      "$calName",
+      "$item.Subject",
+      "$item.Start.ToString('yyyy-MM-ddTHH:mm:ss')",
+      "$item.End.ToString('yyyy-MM-ddTHH:mm:ss')",
+      "$isAllDay",
+      "$item.Location",
+      "$notes",
+      "$rr",
+    ]),
+  ].join("\n");
+}
+
+/**
+ * PowerShell that makes `$item` repeat per an RFC 5545 rule, or stops it repeating for "".
+ * RecurrenceType has to be set before anything else on the pattern or Outlook rejects it.
+ */
+export function recurrenceStatements(recurrence: string): string[] {
+  if (!recurrence) return ["$item.ClearRecurrencePattern()"];
+  const rule = parseRRule(recurrence);
+  if (!rule) throw new Error(`Could not read the repeat rule "${recurrence}".`);
+  const lines = ["$rp = $item.GetRecurrencePattern()", `$rp.RecurrenceType = ${OL_RECURS[rule.freq]}`, `$rp.Interval = ${rule.interval}`];
+  if (rule.freq === "WEEKLY" && rule.byDay?.length) {
+    const mask = rule.byDay.reduce((m, day) => m | (1 << WEEKDAYS.indexOf(day)), 0);
+    lines.push(`$rp.DayOfWeekMask = ${mask}`);
+  }
+  if (rule.count) lines.push(`$rp.Occurrences = ${rule.count}`);
+  else if (rule.until) lines.push(`$rp.PatternEndDate = [datetime]::Parse(${psLiteral(rule.until.toISOString().slice(0, 10))})`);
+  else lines.push("$rp.NoEndDate = $true");
+  return lines;
+}
+
 export function listEventsScript(from: Date, to: Date, calendar?: string): string {
   return [
     preamble(),
@@ -115,12 +176,10 @@ export function listEventsScript(from: Date, to: Date, calendar?: string): strin
     "$items.Sort('[Start]')",
     `$filter = "[Start] >= '${outlookDate(from)}' AND [Start] <= '${outlookDate(to)}'"`,
     "$found = $items.Restrict($filter)",
+    "$calName = $folder.Parent.Name",
     "foreach ($item in $found) {",
     "  if ($null -eq $item.Start) { continue }",
-    "  $isAllDay = if ($item.AllDayEvent) { 'true' } else { 'false' }",
-    "  $startText = $item.Start.ToString('yyyy-MM-ddTHH:mm:ss')",
-    "  $endText = $item.End.ToString('yyyy-MM-ddTHH:mm:ss')",
-    `  ${emit(["$item.EntryID", "$folder.Parent.Name", "$item.Subject", "$startText", "$endText", "$isAllDay", "$item.Location"])}`,
+    eventRecord(),
     "}",
   ].join("\n");
 }
@@ -137,6 +196,7 @@ export function createEventScript(input: CreateEventInput, calendar?: string): s
   if (input.end) lines.push(`$item.End = [datetime]::Parse(${psLiteral(input.end)})`);
   if (input.location) lines.push(`$item.Location = ${psLiteral(input.location)}`);
   if (input.notes) lines.push(`$item.Body = ${psLiteral(input.notes)}`);
+  if (input.recurrence) lines.push(...recurrenceStatements(input.recurrence));
   lines.push("$item.Save()", emit(["$item.EntryID", "$folder.Parent.Name"]));
   return lines.join("\n");
 }
@@ -153,29 +213,18 @@ function itemLookup(uid: string): string {
 export function updateEventScript(input: UpdateEventInput): string {
   const lines = [preamble(), itemLookup(input.uid)];
   if (input.title !== undefined) lines.push(`$item.Subject = ${psLiteral(input.title)}`);
+  if (input.allDay !== undefined) lines.push(`$item.AllDayEvent = ${input.allDay ? "$true" : "$false"}`);
   if (input.start) lines.push(`$item.Start = [datetime]::Parse(${psLiteral(input.start)})`);
   if (input.end) lines.push(`$item.End = [datetime]::Parse(${psLiteral(input.end)})`);
   if (input.location !== undefined) lines.push(`$item.Location = ${psLiteral(input.location)}`);
   if (input.notes !== undefined) lines.push(`$item.Body = ${psLiteral(input.notes)}`);
+  if (input.recurrence !== undefined) lines.push(...recurrenceStatements(input.recurrence));
   lines.push("$item.Save()", "Write-Output 'ok'");
   return lines.join("\n");
 }
 
 export function findEventScript(uid: string): string {
-  return [
-    preamble(),
-    itemLookup(uid),
-    "$isAllDay = if ($item.AllDayEvent) { 'true' } else { 'false' }",
-    emit([
-      "$item.EntryID",
-      "$item.Parent.Parent.Name",
-      "$item.Subject",
-      "$item.Start.ToString('yyyy-MM-ddTHH:mm:ss')",
-      "$item.End.ToString('yyyy-MM-ddTHH:mm:ss')",
-      "$isAllDay",
-      "$item.Location",
-    ]),
-  ].join("\n");
+  return [preamble(), itemLookup(uid), "$calName = $item.Parent.Parent.Name", eventRecord()].join("\n");
 }
 
 export function deleteEventScript(uid: string): string {

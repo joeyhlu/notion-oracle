@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   createEventScript, deleteEventScript, describePowerShellError, findEventScript,
-  listCalendarsScript, listEventsScript, moveEventScript, outlookDate, psLiteral, updateEventScript,
+  listCalendarsScript, listEventsScript, moveEventScript, outlookDate, psLiteral, recurrenceStatements, updateEventScript,
 } from "../src/mcp/win-calendar.ts";
 import { parseEvents } from "../src/mcp/calendar-record.ts";
 
@@ -110,6 +110,37 @@ test("what the scripts print is what the shared parser reads", () => {
     .join(String.fromCharCode(31)) + String.fromCharCode(30);
   assert.deepEqual(parseEvents(sample), [{
     uid: "abc", calendar: "Work", title: "Standup",
-    start: "2026-09-14T09:00:00", end: "2026-09-14T09:15:00", allDay: true, location: "Room 2",
+    start: "2026-09-14T09:00:00", end: "2026-09-14T09:15:00", allDay: true, location: "Room 2", notes: "", recurrence: "",
   }]);
+});
+
+test("a repeat rule becomes an Outlook pattern, type first, with the weekday mask and an end", () => {
+  const weekly = recurrenceStatements("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE");
+  assert.equal(weekly[0], "$rp = $item.GetRecurrencePattern()");
+  assert.equal(weekly[1], "$rp.RecurrenceType = 1", "RecurrenceType must be set before anything else on the pattern");
+  assert.ok(weekly.includes("$rp.Interval = 2"));
+  assert.ok(weekly.includes("$rp.DayOfWeekMask = 10"), "Monday is 2, Wednesday is 8");
+  assert.ok(weekly.includes("$rp.NoEndDate = $true"));
+  assert.ok(recurrenceStatements("FREQ=DAILY;COUNT=5").includes("$rp.Occurrences = 5"));
+  assert.ok(recurrenceStatements("FREQ=MONTHLY;UNTIL=20261231").some((l) => l.startsWith("$rp.PatternEndDate = [datetime]::Parse('2026-12-31')")));
+  assert.deepEqual(recurrenceStatements(""), ["$item.ClearRecurrencePattern()"]);
+  assert.throws(() => recurrenceStatements("FREQ=HOURLY"), /Could not read/);
+});
+
+test("create and update carry the pattern; update can stop a series", () => {
+  const created = createEventScript({ title: "Standup", start: "2026-09-14T09:00:00", recurrence: "FREQ=WEEKLY;BYDAY=MO" });
+  assert.ok(created.indexOf("$rp.RecurrenceType = 1") < created.indexOf("$item.Save()"), "pattern before Save");
+  const cleared = updateEventScript({ uid: "id", calendar: "Calendar", recurrence: "" });
+  assert.match(cleared, /ClearRecurrencePattern/);
+  assert.match(updateEventScript({ uid: "id", calendar: "Calendar", allDay: true }), /\$item\.AllDayEvent = \$true/);
+});
+
+test("every event record reports notes and rebuilds the repeat rule from the pattern", () => {
+  for (const script of [listEventsScript(new Date(2026, 8, 14), new Date(2026, 8, 21)), findEventScript("id")]) {
+    assert.match(script, /\$item\.IsRecurring/);
+    assert.match(script, /FREQ=\$freq/);
+    assert.match(script, /DayOfWeekMask -band 2\) \{ \$days \+= 'MO' \}/);
+    assert.match(script, /\$notes = \[string\]\$item\.Body/);
+    assert.match(script, /"\$notes", "\$rr"\)|\$notes, \$rr\)/);
+  }
 });
