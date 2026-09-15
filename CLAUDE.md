@@ -75,22 +75,28 @@ Windows installer.
 
 ## Visual language
 
-The user asked for the panel to feel like the Claude app, not like Notion and not like a generic
-assistant. That is a specific idiom; hold to it:
+Three redesigns taught one lesson: the panel reads as generated when it tries to be **pretty**, and
+reads as real when it tries to be **invisible**. It is a utility someone opens forty times a day.
 
-- warm paper, not white: `#faf9f5` light, `#262624` dark. Greys are the ink at low alpha.
-- a serif (`--serif`, the system serif stack) for the greeting, section headings and the title —
-  the single most recognisable trait, so it is used only where it carries weight. Sans for
-  everything read as data.
-- terracotta as the one accent. Two tokens, deliberately: `--accent` (#b5532f) fills buttons and
-  must carry white text; `--accent-text` (#b5532f light / #e08b6e dark) is for links and must read
-  on the page. Claude's own #d97757 is 3.1:1 against white, under AA, so the fill is a step deeper.
-- generous radii: 8px controls, 12px containers, 16px message bubbles, pill-shaped chips.
-- one soft, warm shadow.
+- **No display typography.** Headings are 13px semibold in the same system sans as everything
+  else. A serif heading on warm cream with a terracotta accent is the single most recognisable
+  signature of a generated interface — it was here at v0.6.1 and the user rejected it. Do not
+  reintroduce a serif, a 22px heading, or a "hero" greeting.
+- **13px base, tight rhythm.** Real desktop tools are compact. Space goes between groups, not
+  everywhere uniformly. All five setup steps must fit without scrolling at the default height.
+- **Warm neutrals, kept.** `#faf9f5` / `#262624` grounds; greys are the ink at low alpha so they
+  tint against their surface. This is the one thing carried over from the Claude pass, because a
+  cold grey is harsher than it needs to be beside Notion all day.
+- **Colour carries meaning only.** Terracotta on the send button and links; green and brick for
+  status. Nothing is coloured to look designed. Two accent tokens because one cannot serve both
+  jobs: `--accent` (#b5532f) fills buttons and must carry white text; `--accent-text` (#b5532f
+  light / #e08b6e dark) is for links and must read on the page.
+- **Modest radii** (5px controls, 7px containers, 10px window), one hairline weight, one quiet
+  shadow. Native checkboxes and radios are sized to 14px; the OS default is meant for a full window.
 
-The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, so a
-palette change that hurts legibility fails rather than ships. The theme test requires every colour
-token in `:root` to be redefined in both dark blocks; type stacks, radii and timing are exempt.
+The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, and the
+stylesheet tests require every selector to be declared once — an appended "polish" block that
+re-declares rules is how two earlier regressions hid, and the test exists to refuse it.
 
 ## Conventions
 

@@ -1,23 +1,26 @@
 /*
  * Design notes
  *
- * The user asked for the panel to feel like the Claude app rather than like a generic assistant,
- * so it borrows that idiom directly:
+ * This is a utility panel someone opens forty times a day, so the job is to disappear, not to be
+ * admired. Two rewrites went the other way — a Notion pastiche, then a Claude one — and both
+ * still read as generated, because the tell is not the palette. It is display typography and
+ * generous spacing on something that should be dense and quiet.
  *
- *   - warm paper, not white. Claude's ground is an off-white with a faint yellow cast, and its
- *     dark mode is a warm charcoal rather than a blue-black. Greys are the ink at low alpha, so
- *     every surface tints against whatever is behind it.
- *   - a serif for anything that speaks — the greeting, section headings — and a sans for
- *     everything read as data. The serif is the single most recognisable trait, so it is used
- *     only where it carries weight.
- *   - terracotta as the one accent, and nowhere near everything: the primary button, links, the
- *     small title mark. Status keeps its own muted green and brick.
- *   - generous radii and room to breathe. 8px controls, 12px containers, 16px message bubbles.
- *   - one soft, warm shadow.
+ * So:
+ *   - no serif, no display sizes. Headings are 13px semibold, the same family as everything else.
+ *     A serif heading on warm cream with a terracotta accent is the single most recognisable
+ *     signature of a generated interface; it is exactly what was here before.
+ *   - 13px base and tight rhythm. Real desktop tools are compact. Space is spent where it aids
+ *     scanning — between groups — not uniformly.
+ *   - warm neutrals, because the panel sits next to Notion all day and a cold grey is harsher
+ *     than it needs to be. Greys are the ink at low alpha so surfaces tint against their ground.
+ *   - colour carries meaning only: the send button, links, and status. Nothing is coloured to
+ *     look designed.
+ *   - modest radii, one hairline border weight, one quiet shadow.
  *
- * Two terracottas, because one cannot do both jobs: the fill sits behind white text and must be
- * dark enough for that (#b5532f, 4.9:1); a link sits on the page ground and in dark mode must be
- * light enough for the opposite (#e08b6e, 5.8:1). Claude's own #d97757 is 3.1:1 against white.
+ * Two accent tokens, because one cannot do both jobs: the fill sits behind white text and must be
+ * dark enough for it (#b5532f, 4.9:1); a link sits on the page and in dark mode must be light
+ * enough for the opposite (#e08b6e, 5.8:1).
  */
 
 :root {
@@ -40,15 +43,14 @@
   --bad: #b94a3b;
   --bad-soft: rgba(185, 74, 59, 0.12);
   --bubble: #f0eee6;
-  --shadow: 0 0 0 1px rgba(31, 30, 29, 0.06), 0 6px 28px rgba(31, 30, 29, 0.12);
+  --shadow: 0 0 0 1px rgba(31, 30, 29, 0.07), 0 4px 16px rgba(31, 30, 29, 0.10);
 
-  --r: 8px;        /* controls */
-  --r-2: 12px;     /* containers */
-  --r-panel: 16px; /* the window */
+  --r: 5px;        /* controls */
+  --r-2: 7px;      /* containers */
+  --r-panel: 10px; /* the window */
 
-  --t: 120ms ease;
+  --t: 100ms ease;
 
-  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Helvetica, Arial, sans-serif;
 
   color-scheme: light dark;
@@ -118,7 +120,7 @@
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body {
   font-family: var(--sans);
-  font-size: 15px; line-height: 1.6; letter-spacing: 0; color: var(--ink);
+  font-size: 13px; line-height: 1.5; letter-spacing: 0; color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
@@ -133,7 +135,7 @@ a { color: var(--accent-text); text-underline-offset: 2px; }
  * simply not draggable. Move the window by its panel header instead.
  */
 .pill {
-  position: absolute; inset: 8px; border-radius: 14px; border: none;
+  position: absolute; inset: 8px; border-radius: 11px; border: none;
   background: var(--accent); color: var(--accent-ink); font-size: 19px; line-height: 1;
   box-shadow: var(--shadow);
   -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
@@ -151,13 +153,13 @@ body.collapsed .panel { display: none; }
   display: flex; flex-direction: column; overflow: hidden;
 }
 .header {
-  display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px;
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 11px;
   border-bottom: 1px solid var(--line); -webkit-app-region: drag;
 }
 .header button { -webkit-app-region: no-drag; }
-.title { font-family: var(--serif); font-weight: 500; font-size: 16px; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
+.title { font-weight: 600; font-size: 13px; letter-spacing: -.005em; display: flex; align-items: center; gap: 7px; }
 /* A square mark reads sharper than a dot and echoes the radius scale. */
-.dot { width: 9px; height: 9px; border-radius: 50%; background: #d97757; display: inline-block; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #d97757; display: inline-block; }
 .model {
   color: var(--ink-3); font-size: 11px; flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -199,17 +201,17 @@ body.collapsed .panel { display: none; }
 .looking-at strong { color: var(--ink-2); font-weight: 500; }
 
 .messages {
-  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 16px 18px;
-  display: flex; flex-direction: column; gap: 18px;
+  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 12px 13px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 /* Left-aligned and top-anchored: a centred greeting floating in the middle of the panel is the
  * stock empty state, and it leaves the suggestions at the bottom looking unrelated to it. */
-.empty { color: var(--ink-2); max-width: 36ch; margin: 10px 0 0; line-height: 1.6; font-size: 15px; }
-.empty strong { display: block; font-family: var(--serif); font-weight: 500; color: var(--ink); font-size: 24px; line-height: 1.25; letter-spacing: -.005em; margin-bottom: 8px; }
+.empty { color: var(--ink-2); max-width: 44ch; margin: 4px 0 0; line-height: 1.55; font-size: 13px; }
+.empty strong { display: block; color: var(--ink); font-weight: 600; font-size: 13px; margin-bottom: 4px; }
 .msg { line-height: 1.55; word-wrap: break-word; }
 .msg.user {
-  align-self: flex-end; max-width: 85%; background: var(--bubble);
-  padding: 10px 14px; border-radius: 16px; border-bottom-right-radius: 6px; white-space: pre-wrap;
+  align-self: flex-end; max-width: 86%; background: var(--bubble);
+  padding: 7px 11px; border-radius: 10px; border-bottom-right-radius: 4px; white-space: pre-wrap;
 }
 .msg.assistant .body p { margin: 0 0 9px; }
 .msg.assistant .body p:last-child { margin-bottom: 0; }
@@ -254,24 +256,24 @@ body.collapsed .panel { display: none; }
 
 /* ---------- Controls ---------- */
 .chip {
-  border: 1px solid var(--line-2); background: var(--paper); border-radius: 999px;
-  padding: 5px 12px; font-size: 13px; color: var(--ink-2);
+  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r);
+  padding: 3px 9px; font-size: 12px; color: var(--ink-2);
   transition: background var(--t), color var(--t), border-color var(--t);
 }
 .chip:hover { background: var(--wash); border-color: var(--line-2); color: var(--ink); }
 /* The suggestions read as a deliberate row rather than loose buttons with a label that costs
  * one line. QUICK_ACTIONS is populated once and never cleared, so the label cannot outlive it. */
-.quick { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
+.quick { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 13px 8px; }
 .quick::before {
-  flex-basis: 100%; content: "Try asking"; font-family: var(--serif); font-size: 14px; font-weight: 500;
-  color: var(--ink-2); margin-bottom: 4px;
+  flex-basis: 100%; content: "Try asking"; font-size: 11.5px; font-weight: 500;
+  color: var(--ink-3); margin-bottom: 1px;
 }
 .composer {
-  display: flex; gap: 7px; padding: 10px 14px 12px; border-top: 1px solid var(--line);
+  display: flex; gap: 7px; padding: 9px 12px; border-top: 1px solid var(--line);
   align-items: flex-end;
 }
 .composer textarea {
-  flex: 1; resize: none; min-height: 42px; max-height: 180px; padding: 10px 13px;
+  flex: 1; resize: none; min-height: 34px; max-height: 160px; padding: 8px 10px;
   border-radius: var(--r-2); border: 1px solid var(--line-2); background: var(--paper);
   color: var(--ink); font: inherit; letter-spacing: inherit; line-height: 1.45; outline: none;
   transition: border-color var(--t), box-shadow var(--t);
@@ -280,13 +282,13 @@ body.collapsed .panel { display: none; }
 .composer textarea:focus { border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft); }
 .send {
   background: var(--accent); color: var(--accent-ink); border: none; border-radius: var(--r-2);
-  height: 42px; padding: 0 16px; font-size: 14px; font-weight: 500;
+  height: 34px; padding: 0 13px; font-size: 13px; font-weight: 500;
   transition: background var(--t);
 }
 .send:hover { background: var(--accent-hover); }
 .send:active { filter: brightness(.92); }
 .send.stop { background: var(--bad); }
-.hint { font-size: 12px; color: var(--ink-3); padding: 0 14px 10px; }
+.hint { font-size: 11px; color: var(--ink-3); padding: 0 12px 9px; }
 
 /* ---------- Banner ---------- */
 .banner {
@@ -309,14 +311,14 @@ body.collapsed .panel { display: none; }
  */
 .view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px; }
 .view.scroll > * { flex: none; }
-.view-head { padding: 18px 0 12px; }
-/* Section headings in the serif: the one place the panel is allowed to speak rather than list. */
+.view-head { padding: 13px 0 9px; }
+/* A heading, not a masthead. 400px of panel cannot afford display type. */
 .view-head h1 {
-  font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -.005em;
-  color: var(--ink); margin: 0 0 4px;
+  font-size: 13px; font-weight: 600; letter-spacing: -.005em;
+  color: var(--ink); margin: 0 0 3px;
 }
-.view.scroll .view-head p { margin: 0; color: var(--ink-2); font-size: 14px; }
-.view.scroll p { margin: 5px 0 9px; }
+.view.scroll .view-head p { margin: 0; color: var(--ink-2); font-size: 12.5px; }
+.view.scroll p { margin: 5px 0 9px; font-size: 12.5px;}
 .muted { color: var(--ink-2); font-size: 12px; }
 
 .view.scroll label {
@@ -339,9 +341,8 @@ body.collapsed .panel { display: none; }
   transition: border-color var(--t), box-shadow var(--t);
 }
 .view.scroll label.checkbox {
-  display: flex; align-items: flex-start; gap: 8px; font-weight: 400; color: var(--ink-2);
-}
-.view.scroll label.checkbox input { width: auto; margin: 1px 0 0; accent-color: var(--accent); }
+  display: flex; align-items: flex-start; gap: 7px; font-weight: 400; color: var(--ink-2); font-size: 12.5px; line-height: 1.45;}
+.view.scroll label.checkbox input { width: auto; margin: 2px 0 0; accent-color: var(--accent); }
 #follow-note { margin-top: 3px; }
 #theme-note { margin-top: 4px; }
 
@@ -370,12 +371,12 @@ body.collapsed .panel { display: none; }
 .step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r-2) var(--r-2) 0 0; }
 .step:last-of-type { border-radius: 0 0 var(--r-2) var(--r-2); }
 .step-head {
-  display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 14px;
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 11px;
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
   transition: background var(--t);
 }
 .step-head:hover { background: var(--wash); }
-.step-title { font-weight: 550; font-size: 14px; }
+.step-title { font-weight: 500; font-size: 13px; }
 .step-note {
   color: var(--ink-3); font-size: 11.5px; flex: 1; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -416,7 +417,7 @@ body.collapsed .panel { display: none; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-x: auto; user-select: all;
 }
-.steps { padding-left: 17px; font-size: 12px; color: var(--ink-2); margin: 8px 0; }
+.steps { padding-left: 17px; font-size: 12.5px; color: var(--ink-2); margin: 8px 0; }
 .steps li { margin: 5px 0; }
 .steps strong { color: var(--ink); font-weight: 550; }
 
@@ -430,9 +431,9 @@ body.collapsed .panel { display: none; }
 /* ---------- Help ---------- */
 .faq-item { border-bottom: 1px solid var(--line); }
 .faq-q {
-  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 13px 1px;
+  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 9px 1px;
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
-  font-weight: 500; font-size: 15px; transition: color var(--t);
+  font-weight: 500; font-size: 13px; transition: color var(--t);
 }
 .faq-q:hover { color: var(--accent-text); }
 .faq-q .chev { margin-left: auto; }
@@ -484,3 +485,6 @@ body.collapsed .panel { display: none; }
 .version { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .setup-footer .version { margin-left: auto; }
 .setup-footer .quit { margin-left: 10px; }
+
+/* Native controls default to a size meant for a full window; scale them to the panel. */
+.view.scroll input[type="checkbox"], .view.scroll input[type="radio"] { width: 14px; height: 14px; flex: none; }
