@@ -100,17 +100,27 @@ export interface BrainStatus {
   detail: string;
 }
 
-export type ChatEvent =
+/** Every event carries the run it belongs to; the renderer ignores any other. */
+export type ChatEvent = { runId?: string } & (
   | { type: "status"; message: string }
   | { type: "text"; delta: string }
   | { type: "tool-start"; id: string; name: string; input: unknown }
   | { type: "tool-end"; id: string; name: string; ok: boolean; summary: string }
   /** `changes` is attached by the main process; a brain does not know what its tools touched. */
   | { type: "done"; threadId: string | null; text: string; changes?: Change[]; conversationId?: string }
-  | { type: "error"; message: string; threadId: string | null };
+  | { type: "error"; message: string; threadId: string | null }
+);
 
 export interface ChatRequest {
   text: string;
+  /**
+   * Identifies this run, echoed back on every event it produces.
+   *
+   * Without it the renderer cannot tell a late event from a current one: aborting a reply and
+   * starting a new chat leaves the old run finishing in the main process, and its "done" would
+   * land on the new turn and hand it back the thread it was told to forget.
+   */
+  runId: string;
   threadId: string | null;
   /** Which saved conversation this turn belongs to, so the main process can record it. */
   conversationId: string | null;

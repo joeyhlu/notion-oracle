@@ -257,7 +257,8 @@ function changesSince(since: string): Change[] {
 }
 
 async function runChat(request: ChatRequest): Promise<void> {
-  const send = (event: ChatEvent) => win?.webContents.send("oracle:chat-event", event);
+  // Stamped centrally so no event can escape without saying which run produced it.
+  const send = (event: ChatEvent) => win?.webContents.send("oracle:chat-event", { ...event, runId: request.runId });
   const current = settings.get();
   const brain = brains[current.brain];
   const cliPath = await resolveCli(current.brain, current.brain === "claude" ? current.claudePath : current.codexPath);

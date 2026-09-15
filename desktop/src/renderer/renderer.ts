@@ -20,6 +20,15 @@ let settings: Settings;
 let threadId: string | null = null;
 /** Which saved conversation the current chat is; null until the first message creates one. */
 let conversationId: string | null = null;
+/**
+ * The run whose events this panel is still interested in.
+ *
+ * Aborting does not un-start the run already going in the main process, so its events keep
+ * arriving. Without this, starting a new chat and sending again let the old run's "done" land on
+ * the new turn — handing back the thread id the new chat had just been told to forget, and ending
+ * its spinner while it was still working.
+ */
+let currentRunId: string | null = null;
 let busy = false;
 let platform: NodeJS.Platform = "darwin";
 
@@ -178,10 +187,13 @@ async function send(text: string): Promise<void> {
   scrollToBottom();
   currentTurn = { body, tools, thinking, status, raw: "", toolNodes: new Map(), container };
   setBusy(true);
-  await window.oracle.chatSend({ text: trimmed, threadId, conversationId });
+  currentRunId = `r${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  await window.oracle.chatSend({ text: trimmed, runId: currentRunId, threadId, conversationId });
 }
 
 function handleEvent(event: ChatEvent): void {
+  // A run the user has moved on from. Its events are history, not this conversation's.
+  if (event.runId && event.runId !== currentRunId) return;
   const turn = currentTurn;
   if (!turn) return;
   switch (event.type) {
@@ -271,6 +283,8 @@ function resetConversation(): void {
   threadId = null;
   // Without this, "new conversation" keeps appending to the saved one it just left.
   conversationId = null;
+  // Stop listening to the run being aborted, which may still report back.
+  currentRunId = null;
   currentTurn = null;
   setBusy(false);
   renderEmpty();
@@ -489,6 +503,10 @@ async function openConversation(id: string): Promise<void> {
     void renderHistory();
     return;
   }
+  if (busy) void window.oracle.chatAbort();
+  currentRunId = null;
+  currentTurn = null;
+  setBusy(false);
   conversationId = conversation.id;
   threadId = conversation.threadId;
   messages().replaceChildren();
@@ -512,9 +530,7 @@ function renderSavedReply(text: string): void {
 }
 
 function startNewConversation(): void {
-  threadId = null;
-  conversationId = null;
-  renderEmpty();
+  resetConversation();
 }
 
 async function renderChanges(): Promise<void> {

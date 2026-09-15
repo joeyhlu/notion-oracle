@@ -43,7 +43,8 @@ function installBridge(ready) {
     }),
     getPageHint: async () => window.__hint ?? null,
     testNotion: async () => ({ ok: true, message: "Connected" }),
-    chatSend: async () => {}, chatAbort: async () => {},
+    chatSend: async (req) => { window.__lastRun = req.runId; },
+    chatAbort: async () => {},
     getChanges: async () => window.__changes ?? [],
     undoChange: async (id) => {
       window.__changes = (window.__changes ?? []).map((c) => (c.id === id ? { ...c, undone: true } : c));
@@ -56,7 +57,8 @@ function installBridge(ready) {
       window.__conversations = (window.__conversations ?? []).filter((c) => c.id !== id);
     },
     setMode: () => {}, openExternal: () => {}, openSignIn: () => {}, quit: () => {},
-    onChatEvent: () => {}, onMode: () => {},
+    onChatEvent: (cb) => { window.__emit = cb; },
+    onMode: () => {},
   };
 }
 
@@ -261,6 +263,41 @@ for (const ready of [true, false]) {
     () => [...document.querySelectorAll("#faq .faq-item.open")].map((i) => i.dataset.faq)),
     ["window-permission"]);
   await page.evaluate(() => { window.__hint = null; });
+
+  // Clicking New chat while a reply is in flight must not let that reply come back and reattach
+  // the conversation it was told to forget.
+  await page.evaluate(() => {
+    document.getElementById("input").value = "first question";
+    document.getElementById("send").click();
+  });
+  const staleRun = await page.evaluate(() => window.__lastRun);
+  await page.click("#btn-new");
+  await page.evaluate(() => {
+    document.getElementById("input").value = "second question";
+    document.getElementById("send").click();
+  });
+  const liveRun = await page.evaluate(() => window.__lastRun);
+  check(`${state}: each send is its own run`, staleRun !== liveRun && Boolean(staleRun && liveRun), true);
+
+  // The abandoned run reports back, as it really does once the CLI notices the abort.
+  await page.evaluate((runId) => {
+    // Text arrives as deltas; done only finalises. Both must be ignored for an abandoned run.
+    window.__emit({ type: "text", runId, delta: "late reply" });
+    window.__emit({ type: "done", runId, threadId: "stale-cli-session", text: "late reply", changes: [], conversationId: "stale-convo" });
+  }, staleRun);
+  check(`${state}: the stale reply is not drawn`, await page.evaluate(
+    () => document.getElementById("messages").innerText.includes("late reply")), false);
+  check(`${state}: the new turn is still running`, await page.locator("#send").innerText(), "Stop");
+
+  // And the live run still lands normally.
+  await page.evaluate((runId) => {
+    window.__emit({ type: "text", runId, delta: "real reply" });
+    window.__emit({ type: "done", runId, threadId: "live-cli-session", text: "real reply", changes: [] });
+  }, liveRun);
+  await page.waitForFunction(() => document.getElementById("send").innerText === "Send");
+  check(`${state}: the live reply is drawn`, await page.evaluate(
+    () => document.getElementById("messages").innerText.includes("real reply")), true);
+  await page.click("#btn-new");
 
   check(`${state}: console clean`, noise, []);
   await page.close();
