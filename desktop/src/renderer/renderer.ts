@@ -9,6 +9,11 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 type View = "chat" | "setup" | "help" | "changes" | "history";
 
+/** "Claude" rather than "Claude (via Claude Code)": the header is narrow and the mechanism belongs in setup. */
+function shortLabel(brain: BrainId): string {
+  return BRAIN_LABELS[brain].split(" (")[0] ?? BRAIN_LABELS[brain];
+}
+
 /** Baked in by the build from package.json, so it cannot drift from what was released. */
 const VERSION = __APP_VERSION__;
 
@@ -361,7 +366,7 @@ async function saveSetup(): Promise<void> {
   if (brain === "claude") patch.claudePath = cliPath;
   else patch.codexPath = cliPath;
   settings = await window.oracle.saveSettings(patch);
-  $("brain-label").textContent = BRAIN_LABELS[settings.brain];
+  $("brain-label").textContent = shortLabel(settings.brain);
   $("save-status").textContent = "Saved.";
   // Changing brain or model means the CLI session no longer applies.
   threadId = null;
@@ -763,7 +768,7 @@ async function loadState(): Promise<void> {
   platform = await window.oracle.platform();
   settings = await window.oracle.getSettings();
   applyTheme(settings.theme);
-  $("brain-label").textContent = BRAIN_LABELS[settings.brain];
+  $("brain-label").textContent = shortLabel(settings.brain);
   showView(settings.setupComplete ? "chat" : "setup");
   void refreshSetupStatus();
 }

@@ -75,19 +75,22 @@ Windows installer.
 
 ## Visual language
 
-The panel floats beside Notion, so it follows Notion's idiom rather than a generic one:
+The user asked for the panel to feel like the Claude app, not like Notion and not like a generic
+assistant. That is a specific idiom; hold to it:
 
-- warm neutrals. The ink is `#37352f` and the greys are that colour at low alpha, not separate
-  swatches — which is why hover states tint against whatever is behind them.
-- small radii: 3px controls, 5px containers, 8px window. Never round a button to 8px.
-- Notion's three-layer menu shadow (hairline ring plus two spreads), not one soft blur.
-- the system font stack. A bundled typeface reads as foreign next to Notion.
-- two blues, deliberately. `--accent` fills buttons and must carry white text; `--accent-text` is
-  for links and must read against the page. In dark mode those pull opposite ways, so one value
-  cannot serve both — Notion's own `#2383e2` button is 3.9:1 against its white label, under AA.
+- warm paper, not white: `#faf9f5` light, `#262624` dark. Greys are the ink at low alpha.
+- a serif (`--serif`, the system serif stack) for the greeting, section headings and the title —
+  the single most recognisable trait, so it is used only where it carries weight. Sans for
+  everything read as data.
+- terracotta as the one accent. Two tokens, deliberately: `--accent` (#b5532f) fills buttons and
+  must carry white text; `--accent-text` (#b5532f light / #e08b6e dark) is for links and must read
+  on the page. Claude's own #d97757 is 3.1:1 against white, under AA, so the fill is a step deeper.
+- generous radii: 8px controls, 12px containers, 16px message bubbles, pill-shaped chips.
+- one soft, warm shadow.
 
 The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, so a
-palette change that hurts legibility fails rather than ships.
+palette change that hurts legibility fails rather than ships. The theme test requires every colour
+token in `:root` to be redefined in both dark blocks; type stacks, radii and timing are exempt.
 
 ## Conventions
 

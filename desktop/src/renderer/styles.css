@@ -1,105 +1,105 @@
 /*
  * Design notes
  *
- * This panel floats beside the Notion desktop app, so it should look like it belongs there rather
- * than like a different product parked on top. The palette, radii, hover washes and shadow stack
- * below are Notion's own idiom:
+ * The user asked for the panel to feel like the Claude app rather than like a generic assistant,
+ * so it borrows that idiom directly:
  *
- *   - warm neutrals, not cool grey. Notion's ink is #37352f, a brown-black, and its greys are that
- *     colour at low alpha rather than separate swatches. Using alpha means every surface tints
- *     itself against whatever is behind it, which is why Notion's hover states feel soft.
- *   - blue #2383e2 is the one accent, used for the primary action and links and nothing else.
- *   - small radii. 3px on controls, 5px on containers. Notion never rounds a button to 8px.
- *   - the shadow is Notion's three-layer menu stack — a hairline ring plus two spreads — not a
- *     single soft blur.
- *   - system font. Notion ships no typeface of its own, and a bundled one would read as foreign
- *     next to it.
+ *   - warm paper, not white. Claude's ground is an off-white with a faint yellow cast, and its
+ *     dark mode is a warm charcoal rather than a blue-black. Greys are the ink at low alpha, so
+ *     every surface tints against whatever is behind it.
+ *   - a serif for anything that speaks — the greeting, section headings — and a sans for
+ *     everything read as data. The serif is the single most recognisable trait, so it is used
+ *     only where it carries weight.
+ *   - terracotta as the one accent, and nowhere near everything: the primary button, links, the
+ *     small title mark. Status keeps its own muted green and brick.
+ *   - generous radii and room to breathe. 8px controls, 12px containers, 16px message bubbles.
+ *   - one soft, warm shadow.
+ *
+ * Two terracottas, because one cannot do both jobs: the fill sits behind white text and must be
+ * dark enough for that (#b5532f, 4.9:1); a link sits on the page ground and in dark mode must be
+ * light enough for the opposite (#e08b6e, 5.8:1). Claude's own #d97757 is 3.1:1 against white.
  */
 
 :root {
-  --ink: #37352f;
-  --ink-2: rgba(55, 53, 47, 0.65);
-  --ink-3: rgba(55, 53, 47, 0.45);
-  --paper: #ffffff;
-  --paper-2: #f7f7f5;          /* Notion's sidebar ground */
-  --line: rgba(55, 53, 47, 0.09);
-  --line-2: rgba(55, 53, 47, 0.16);
-  --wash: rgba(55, 53, 47, 0.06);   /* hover */
-  --wash-2: rgba(55, 53, 47, 0.11); /* pressed */
-  /*
-   * Two blues, because one cannot do both jobs. The fill sits behind white text, so it must be
-   * dark enough for that; a link sits on the page ground, so in dark mode it must be light enough
-   * for that. Notion's own #2383e2 button is 3.9:1 against its white label — under AA — so the
-   * fill is the same hue taken a step deeper, and the link keeps Notion's brighter tone.
-   */
-  --accent: #1d72c9;            /* fill: 4.9:1 with white */
+  --ink: #1f1e1d;
+  --ink-2: #5e5d59;
+  --ink-3: #8b8a83;
+  --paper: #faf9f5;
+  --paper-2: #f0eee6;
+  --line: rgba(31, 30, 29, 0.10);
+  --line-2: rgba(31, 30, 29, 0.18);
+  --wash: rgba(31, 30, 29, 0.05);
+  --wash-2: rgba(31, 30, 29, 0.09);
+  --accent: #b5532f;            /* fill */
   --accent-ink: #ffffff;
-  --accent-hover: #1a68b8;
-  --accent-text: #1a68b8;       /* links: 5.7:1 on white */
-  --accent-soft: rgba(35, 131, 226, 0.14);
-  --good: #0f7b6c;
-  --good-soft: rgba(15, 123, 108, 0.12);
-  --bad: #e03e3e;
-  --bad-soft: rgba(224, 62, 62, 0.11);
-  --bubble: #f1f1ef;
+  --accent-hover: #a64a2a;
+  --accent-text: #b5532f;       /* links */
+  --accent-soft: rgba(217, 119, 87, 0.18);
+  --good: #3b7a57;
+  --good-soft: rgba(59, 122, 87, 0.13);
+  --bad: #b94a3b;
+  --bad-soft: rgba(185, 74, 59, 0.12);
+  --bubble: #f0eee6;
+  --shadow: 0 0 0 1px rgba(31, 30, 29, 0.06), 0 6px 28px rgba(31, 30, 29, 0.12);
 
-  --r: 3px;        /* controls */
-  --r-2: 5px;      /* containers */
-  --r-panel: 8px;  /* the window itself */
+  --r: 8px;        /* controls */
+  --r-2: 12px;     /* containers */
+  --r-panel: 16px; /* the window */
 
-  --shadow: rgba(15, 15, 15, 0.05) 0 0 0 1px, rgba(15, 15, 15, 0.1) 0 3px 6px, rgba(15, 15, 15, 0.2) 0 9px 24px;
+  --t: 120ms ease;
 
-  --t: 20ms ease-in;   /* Notion's transitions are nearly instant */
+  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Helvetica, Arial, sans-serif;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ink: rgba(255, 255, 255, 0.81);
-    --ink-2: rgba(255, 255, 255, 0.46);
-    --ink-3: rgba(255, 255, 255, 0.34);
-    --paper: #191919;
-    --paper-2: #202020;
-    --line: rgba(255, 255, 255, 0.094);
-    --line-2: rgba(255, 255, 255, 0.18);
-    --wash: rgba(255, 255, 255, 0.055);
-    --wash-2: rgba(255, 255, 255, 0.1);
-    --accent: #1d72c9;
+    --ink: #f0eee6;
+    --ink-2: #b0aea5;
+    --ink-3: #85837b;
+    --paper: #262624;
+    --paper-2: #30302e;
+    --line: rgba(240, 238, 230, 0.11);
+    --line-2: rgba(240, 238, 230, 0.2);
+    --wash: rgba(240, 238, 230, 0.06);
+    --wash-2: rgba(240, 238, 230, 0.11);
+    --accent: #b5532f;
     --accent-ink: #ffffff;
-    --accent-hover: #2a82dd;
-    --accent-text: #529cca;     /* 5.8:1 on #191919 */
-    --accent-soft: rgba(82, 156, 202, 0.2);
-    --good: #4dab9a;
-    --good-soft: rgba(77, 171, 154, 0.16);
-    --bad: #ff7369;
-    --bad-soft: rgba(255, 115, 105, 0.14);
-    --bubble: #2f2f2f;
-    --shadow: rgba(15, 15, 15, 0.1) 0 0 0 1px, rgba(15, 15, 15, 0.2) 0 3px 6px, rgba(15, 15, 15, 0.4) 0 9px 24px;
+    --accent-hover: #c25d38;
+    --accent-text: #e08b6e;
+    --accent-soft: rgba(224, 139, 110, 0.22);
+    --good: #7fbf98;
+    --good-soft: rgba(127, 191, 152, 0.16);
+    --bad: #e08373;
+    --bad-soft: rgba(224, 131, 115, 0.16);
+    --bubble: #383836;
+    --shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 32px rgba(0, 0, 0, 0.45);
   }
 }
 
 :root[data-theme="dark"] {
-  --ink: rgba(255, 255, 255, 0.81);
-  --ink-2: rgba(255, 255, 255, 0.46);
-  --ink-3: rgba(255, 255, 255, 0.34);
-  --paper: #191919;
-  --paper-2: #202020;
-  --line: rgba(255, 255, 255, 0.094);
-  --line-2: rgba(255, 255, 255, 0.18);
-  --wash: rgba(255, 255, 255, 0.055);
-  --wash-2: rgba(255, 255, 255, 0.1);
-  --accent: #1d72c9;
+  --ink: #f0eee6;
+  --ink-2: #b0aea5;
+  --ink-3: #85837b;
+  --paper: #262624;
+  --paper-2: #30302e;
+  --line: rgba(240, 238, 230, 0.11);
+  --line-2: rgba(240, 238, 230, 0.2);
+  --wash: rgba(240, 238, 230, 0.06);
+  --wash-2: rgba(240, 238, 230, 0.11);
+  --accent: #b5532f;
   --accent-ink: #ffffff;
-  --accent-hover: #2a82dd;
-  --accent-text: #529cca;
-  --accent-soft: rgba(82, 156, 202, 0.2);
-  --good: #4dab9a;
-  --good-soft: rgba(77, 171, 154, 0.16);
-  --bad: #ff7369;
-  --bad-soft: rgba(255, 115, 105, 0.14);
-  --bubble: #2f2f2f;
-  --shadow: rgba(15, 15, 15, 0.1) 0 0 0 1px, rgba(15, 15, 15, 0.2) 0 3px 6px, rgba(15, 15, 15, 0.4) 0 9px 24px;
+  --accent-hover: #c25d38;
+  --accent-text: #e08b6e;
+  --accent-soft: rgba(224, 139, 110, 0.22);
+  --good: #7fbf98;
+  --good-soft: rgba(127, 191, 152, 0.16);
+  --bad: #e08373;
+  --bad-soft: rgba(224, 131, 115, 0.16);
+  --bubble: #383836;
+  --shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 32px rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
@@ -117,8 +117,8 @@
 
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body {
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  font-size: 14px; line-height: 1.5; letter-spacing: 0; color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px; line-height: 1.6; letter-spacing: 0; color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
@@ -133,7 +133,7 @@ a { color: var(--accent-text); text-underline-offset: 2px; }
  * simply not draggable. Move the window by its panel header instead.
  */
 .pill {
-  position: absolute; inset: 8px; border-radius: 8px; border: none;
+  position: absolute; inset: 8px; border-radius: 14px; border: none;
   background: var(--accent); color: var(--accent-ink); font-size: 19px; line-height: 1;
   box-shadow: var(--shadow);
   -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
@@ -155,9 +155,9 @@ body.collapsed .panel { display: none; }
   border-bottom: 1px solid var(--line); -webkit-app-region: drag;
 }
 .header button { -webkit-app-region: no-drag; }
-.title { font-weight: 600; font-size: 13px; letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; }
+.title { font-family: var(--serif); font-weight: 500; font-size: 16px; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
 /* A square mark reads sharper than a dot and echoes the radius scale. */
-.dot { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #d97757; display: inline-block; }
 .model {
   color: var(--ink-3); font-size: 11px; flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -183,8 +183,8 @@ body.collapsed .panel { display: none; }
 [data-tip]::after {
   content: attr(data-tip);
   position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-  padding: 3px 7px; border-radius: var(--r-2); white-space: nowrap;
-  background: #2f2f2f; color: rgba(255,255,255,.9); font-size: 12px; font-weight: 400;
+  padding: 4px 9px; border-radius: 7px; white-space: nowrap;
+  background: #1f1e1d; color: #f0eee6; font-size: 12px; font-weight: 400;
   letter-spacing: 0; pointer-events: none; opacity: 0; transition: opacity 90ms ease 40ms;
   z-index: 5;
 }
@@ -199,17 +199,17 @@ body.collapsed .panel { display: none; }
 .looking-at strong { color: var(--ink-2); font-weight: 500; }
 
 .messages {
-  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 14px;
-  display: flex; flex-direction: column; gap: 14px;
+  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 18px;
 }
 /* Left-aligned and top-anchored: a centred greeting floating in the middle of the panel is the
  * stock empty state, and it leaves the suggestions at the bottom looking unrelated to it. */
-.empty { color: var(--ink-2); max-width: 38ch; margin: 2px 0 0; line-height: 1.6; }
-.empty strong { display: block; color: var(--ink); font-size: 14px; letter-spacing: -.015em; margin-bottom: 3px; }
+.empty { color: var(--ink-2); max-width: 36ch; margin: 10px 0 0; line-height: 1.6; font-size: 15px; }
+.empty strong { display: block; font-family: var(--serif); font-weight: 500; color: var(--ink); font-size: 24px; line-height: 1.25; letter-spacing: -.005em; margin-bottom: 8px; }
 .msg { line-height: 1.55; word-wrap: break-word; }
 .msg.user {
-  align-self: flex-end; max-width: 88%; background: var(--bubble);
-  padding: 7px 11px; border-radius: var(--r-2); white-space: pre-wrap;
+  align-self: flex-end; max-width: 85%; background: var(--bubble);
+  padding: 10px 14px; border-radius: 16px; border-bottom-right-radius: 6px; white-space: pre-wrap;
 }
 .msg.assistant .body p { margin: 0 0 9px; }
 .msg.assistant .body p:last-child { margin-bottom: 0; }
@@ -254,8 +254,8 @@ body.collapsed .panel { display: none; }
 
 /* ---------- Controls ---------- */
 .chip {
-  border: 1px solid var(--line); background: var(--paper); border-radius: var(--r-2);
-  padding: 3px 9px; font-size: 12px; color: var(--ink-2);
+  border: 1px solid var(--line-2); background: var(--paper); border-radius: 999px;
+  padding: 5px 12px; font-size: 13px; color: var(--ink-2);
   transition: background var(--t), color var(--t), border-color var(--t);
 }
 .chip:hover { background: var(--wash); border-color: var(--line-2); color: var(--ink); }
@@ -263,16 +263,16 @@ body.collapsed .panel { display: none; }
  * one line. QUICK_ACTIONS is populated once and never cleared, so the label cannot outlive it. */
 .quick { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
 .quick::before {
-  flex-basis: 100%; content: "Try"; font-size: 12px; font-weight: 500;
-  color: var(--ink-3); margin-bottom: 2px;
+  flex-basis: 100%; content: "Try asking"; font-family: var(--serif); font-size: 14px; font-weight: 500;
+  color: var(--ink-2); margin-bottom: 4px;
 }
 .composer {
   display: flex; gap: 7px; padding: 10px 14px 12px; border-top: 1px solid var(--line);
   align-items: flex-end;
 }
 .composer textarea {
-  flex: 1; resize: none; min-height: 34px; max-height: 160px; padding: 7px 9px;
-  border-radius: var(--r-2); border: 1px solid var(--line); background: var(--paper);
+  flex: 1; resize: none; min-height: 42px; max-height: 180px; padding: 10px 13px;
+  border-radius: var(--r-2); border: 1px solid var(--line-2); background: var(--paper);
   color: var(--ink); font: inherit; letter-spacing: inherit; line-height: 1.45; outline: none;
   transition: border-color var(--t), box-shadow var(--t);
 }
@@ -280,13 +280,13 @@ body.collapsed .panel { display: none; }
 .composer textarea:focus { border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft); }
 .send {
   background: var(--accent); color: var(--accent-ink); border: none; border-radius: var(--r-2);
-  height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 550;
+  height: 42px; padding: 0 16px; font-size: 14px; font-weight: 500;
   transition: background var(--t);
 }
 .send:hover { background: var(--accent-hover); }
 .send:active { filter: brightness(.92); }
 .send.stop { background: var(--bad); }
-.hint { font-size: 11px; color: var(--ink-3); padding: 0 14px 9px; }
+.hint { font-size: 12px; color: var(--ink-3); padding: 0 14px 10px; }
 
 /* ---------- Banner ---------- */
 .banner {
@@ -309,14 +309,13 @@ body.collapsed .panel { display: none; }
  */
 .view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px; }
 .view.scroll > * { flex: none; }
-.view-head { padding: 16px 0 10px; }
-/* A tracked-out micro-label instead of a large heading: the panel is 400px wide, and a 24px
- * title would spend a tenth of the window announcing which screen you are already looking at. */
+.view-head { padding: 18px 0 12px; }
+/* Section headings in the serif: the one place the panel is allowed to speak rather than list. */
 .view-head h1 {
-  font-size: 12px; font-weight: 500; letter-spacing: 0;
-  color: var(--ink-3); margin: 0 0 6px;
+  font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -.005em;
+  color: var(--ink); margin: 0 0 4px;
 }
-.view.scroll .view-head p { margin: 0; color: var(--ink); font-size: 13px; }
+.view.scroll .view-head p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .view.scroll p { margin: 5px 0 9px; }
 .muted { color: var(--ink-2); font-size: 12px; }
 
@@ -371,12 +370,12 @@ body.collapsed .panel { display: none; }
 .step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r-2) var(--r-2) 0 0; }
 .step:last-of-type { border-radius: 0 0 var(--r-2) var(--r-2); }
 .step-head {
-  display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 11px;
+  display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 14px;
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
   transition: background var(--t);
 }
 .step-head:hover { background: var(--wash); }
-.step-title { font-weight: 550; font-size: 12.5px; }
+.step-title { font-weight: 550; font-size: 14px; }
 .step-note {
   color: var(--ink-3); font-size: 11.5px; flex: 1; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -431,9 +430,9 @@ body.collapsed .panel { display: none; }
 /* ---------- Help ---------- */
 .faq-item { border-bottom: 1px solid var(--line); }
 .faq-q {
-  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 10px 1px;
+  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 13px 1px;
   background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
-  font-weight: 550; font-size: 12.5px; transition: color var(--t);
+  font-weight: 500; font-size: 15px; transition: color var(--t);
 }
 .faq-q:hover { color: var(--accent-text); }
 .faq-q .chev { margin-left: auto; }
