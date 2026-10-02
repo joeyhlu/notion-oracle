@@ -1,6 +1,9 @@
 /** Overlay UI: a collapsed pill, the chat panel, and the setup/settings view. */
 
 import { markdownToHtml } from "../../../extension/src/lib/markdown.ts";
+import { describeTool, isWriteTool } from "../../../extension/src/lib/activity.ts";
+import { iconSvg } from "../../../extension/src/shared/icons.ts";
+import { markSvg } from "../../../extension/src/shared/mark.ts";
 import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type Change, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
 import { summarise } from "../shared/journal.ts";
 import { titleFrom, type Conversation } from "../shared/conversations.ts";
@@ -17,12 +20,12 @@ function shortLabel(brain: BrainId): string {
 /** Baked in by the build from package.json, so it cannot drift from what was released. */
 const VERSION = __APP_VERSION__;
 
-const QUICK_ACTIONS = [
-  "Summarize the page I'm looking at",
-  "What\u2019s on my calendar this week?",
-  "Move my dentist appointment to Friday at 3",
-  "Turn this page into a to-do list and add it to the end",
-  "Create a page under this one with an outline for…",
+const QUICK_ACTIONS: Array<[icon: string, text: string]> = [
+  ["summarize", "Summarize the page I'm looking at"],
+  ["list", "What\u2019s on my calendar this week?"],
+  ["edit", "Move my dentist appointment to Friday at 3"],
+  ["todo", "Turn this page into a to-do list and add it to the end"],
+  ["page", "Create a page under this one with an outline for…"],
 ];
 
 let settings: Settings;
@@ -134,7 +137,7 @@ function renderEmpty(): void {
   messages().replaceChildren();
   showSuggestions(true);
   const empty = el("div", "empty");
-  empty.innerHTML = "<strong>Hi, I'm Oracle.</strong>Ask about the page you have open in Notion, draft content, or add events to a calendar. Everything I change shows up in Notion right away.";
+  empty.innerHTML = `<span class="mark">${markSvg(28)}</span><strong>How can I help?</strong>Ask about the page you have open in Notion, draft something, or change your calendar. What I change shows up in Notion right away.`;
   messages().appendChild(empty);
 }
 
@@ -150,7 +153,8 @@ function scrollToBottom(): void {
 function setBusy(next: boolean): void {
   busy = next;
   const send = $<HTMLButtonElement>("send");
-  send.textContent = next ? "Stop" : "Send";
+  send.innerHTML = iconSvg(next ? "stop" : "send", next ? 12 : 16);
+  send.setAttribute("aria-label", next ? "Stop" : "Send");
   send.classList.toggle("stop", next);
 }
 
@@ -222,8 +226,10 @@ function handleEvent(event: ChatEvent): void {
     case "tool-start": {
       turn.status.hidden = true;
       turn.thinking.hidden = true;
-      const node = el("div", "tool running");
-      node.append(el("span", "name", event.name), el("span", "status", "running"));
+      const node = el("div", `tool running${isWriteTool(event.name) ? " write" : ""}`);
+      const status = el("span", "status");
+      status.append(el("span", "spinner"));
+      node.append(status, el("span", "name", describeTool(event.name, event.input)));
       turn.tools.appendChild(node);
       turn.toolNodes.set(event.id, node);
       scrollToBottom();
@@ -234,8 +240,7 @@ function handleEvent(event: ChatEvent): void {
       if (node) {
         node.classList.remove("running");
         node.classList.toggle("error", !event.ok);
-        node.querySelector(".status")!.textContent = event.ok ? "done" : "failed";
-        node.appendChild(el("span", "summary", event.summary));
+        node.querySelector(".status")!.innerHTML = iconSvg(event.ok ? "check" : "close", 12);
         node.title = event.summary;
       }
       turn.thinking.hidden = false;
@@ -615,7 +620,8 @@ function openStep(name: string): void {
 function setBadge(id: string, state: "ok" | "warn" | "optional" | "pending", note: string): void {
   const badge = $(`badge-${id}`);
   badge.className = `step-badge ${state === "pending" ? "" : state}`.trim();
-  badge.textContent = state === "ok" ? "\u2713" : state === "warn" ? "!" : state === "optional" ? "\u2013" : "\u2026";
+  // Words, as a Notion status property shows them, rather than symbols to decode.
+  badge.textContent = state === "ok" ? "Done" : state === "warn" ? "Needs you" : state === "optional" ? "Optional" : "Checking";
   $(`note-${id}`).textContent = note;
 }
 
@@ -666,11 +672,20 @@ function showVersion(): void {
   }
 }
 
+/** Draws the icons and the mark the markup asks for with data-icon and data-mark. */
+function drawIcons(): void {
+  for (const slot of document.querySelectorAll<HTMLElement>("[data-icon]")) slot.outerHTML = iconSvg(slot.dataset.icon ?? "");
+  for (const slot of document.querySelectorAll<HTMLElement>("[data-mark]")) slot.innerHTML = markSvg(Number(slot.dataset.mark) || 40);
+}
+
 function wireControls(): void {
+  drawIcons();
   showVersion();
   renderEmpty();
-  for (const action of QUICK_ACTIONS) {
-    const chip = el("button", "chip", action) as HTMLButtonElement;
+  for (const [icon, action] of QUICK_ACTIONS) {
+    const chip = el("button", "suggestion") as HTMLButtonElement;
+    chip.innerHTML = iconSvg(icon);
+    chip.append(el("span", "", action));
     chip.addEventListener("click", () => {
       if (action.endsWith("…")) {
         const input = $<HTMLTextAreaElement>("input");

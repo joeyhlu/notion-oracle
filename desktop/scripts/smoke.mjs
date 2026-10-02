@@ -290,14 +290,14 @@ for (const ready of [true, false]) {
   }, staleRun);
   check(`${state}: the stale reply is not drawn`, await page.evaluate(
     () => document.getElementById("messages").innerText.includes("late reply")), false);
-  check(`${state}: the new turn is still running`, await page.locator("#send").innerText(), "Stop");
+  check(`${state}: the new turn is still running`, await page.locator("#send").getAttribute("aria-label"), "Stop");
 
   // And the live run still lands normally.
   await page.evaluate((runId) => {
     window.__emit({ type: "text", runId, delta: "real reply" });
     window.__emit({ type: "done", runId, threadId: "live-cli-session", text: "real reply", changes: [] });
   }, liveRun);
-  await page.waitForFunction(() => document.getElementById("send").innerText === "Send");
+  await page.waitForFunction(() => document.getElementById("send").getAttribute("aria-label") === "Send");
   check(`${state}: the live reply is drawn`, await page.evaluate(
     () => document.getElementById("messages").innerText.includes("real reply")), true);
   await page.click("#btn-new");

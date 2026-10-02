@@ -1,122 +1,189 @@
-/* Oracle setup. Same tokens as the panel inside Notion; every selector is declared once. */
+/*
+ * Oracle setup, drawn as a Notion page: page icon, 40px title, property rows, then blocks
+ * (headings, text, callouts, a simple table, settings rows). Notion's measurements: a 708px
+ * column, 16px body text, headings 24px. Same tokens as the panel inside Notion; every selector is
+ * declared once.
+ */
 
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
   --bg-2: #f7f7f5;
+  --bg-3: #f1f1ef;
   --ink: #37352f;
   --ink-2: rgba(55, 53, 47, 0.72);
   --ink-3: rgba(55, 53, 47, 0.45);
   --line: rgba(55, 53, 47, 0.09);
   --line-2: rgba(55, 53, 47, 0.16);
   --hover: rgba(55, 53, 47, 0.06);
-  --accent: #b5532f;
+  --field: rgba(242, 241, 238, 0.6);
+  --accent: #1c74d4;
   --accent-ink: #ffffff;
-  --accent-hover: #a14826;
-  --accent-text: #b5532f;
-  --accent-soft: rgba(181, 83, 47, 0.1);
-  --good: #448361;
-  --good-soft: rgba(68, 131, 97, 0.1);
-  --bad: #c4423d;
-  --bad-soft: rgba(212, 76, 71, 0.08);
-  --r: 6px;
-  --r-2: 10px;
-  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, Arial, sans-serif;
+  --accent-hover: #1a6fcb;
+  --accent-text: #1c74d4;
+  --switch-on: #2383e2;
+  --switch-off: rgba(135, 131, 120, 0.3);
+  --focus: 0 0 0 1px rgba(35, 131, 226, 0.57) inset, 0 0 0 2px rgba(35, 131, 226, 0.35);
+  --button-shadow: inset 0 0 0 1px rgba(15, 15, 15, 0.1), 0 1px 2px rgba(15, 15, 15, 0.1);
+  --tag-ink: #32302c;
+  --tag-bg: #e3e2e0;
+  --good: #1c3829;
+  --good-bg: #dbeddb;
+  --bad: #5d1715;
+  --bad-bg: #ffe2dd;
+  --bad-text: #c4423d;
+  --good-text: #448361;
+  --r: 4px;
+  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji";
+  --mono: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #191919;
     --bg-2: #202020;
+    --bg-3: #2c2c2c;
     --ink: rgba(255, 255, 255, 0.86);
     --ink-2: rgba(255, 255, 255, 0.58);
     --ink-3: rgba(255, 255, 255, 0.36);
     --line: rgba(255, 255, 255, 0.08);
     --line-2: rgba(255, 255, 255, 0.14);
     --hover: rgba(255, 255, 255, 0.055);
-    --accent-text: #e3906f;
-    --accent-soft: rgba(224, 139, 110, 0.14);
-    --good: #6bb38d;
-    --good-soft: rgba(107, 179, 141, 0.12);
-    --bad: #e9746e;
-    --bad-soft: rgba(233, 116, 110, 0.1);
+    --field: rgba(255, 255, 255, 0.055);
+    --accent-text: #529cca;
+    --switch-off: rgba(202, 204, 206, 0.3);
+    --focus: 0 0 0 1px rgba(35, 131, 226, 0.7) inset, 0 0 0 2px rgba(35, 131, 226, 0.45);
+    --button-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.094), 0 1px 2px rgba(15, 15, 15, 0.2);
+    --tag-ink: rgba(255, 255, 255, 0.86);
+    --tag-bg: #4a4a4a;
+    --good: rgba(255, 255, 255, 0.86);
+    --good-bg: #2b593f;
+    --bad: rgba(255, 255, 255, 0.86);
+    --bad-bg: #6e3630;
+    --bad-text: #e9746e;
+    --good-text: #6bb38d;
   }
 }
 
 [hidden] { display: none !important; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
-main { max-width: 640px; margin: 0 auto; padding: 48px 24px 64px; }
-a { color: var(--accent-text); text-decoration: none; }
-a:hover { text-decoration: underline; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
+a:hover { text-decoration-color: currentColor; }
 b { font-weight: 600; }
+svg { display: block; flex: none; }
 
-.top { display: flex; align-items: center; gap: 10px; }
-.mark { display: inline-flex; }
-h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
-.version { font-size: 12px; color: var(--ink-2); }
-.lede { color: var(--ink-2); margin: 8px 0 28px; }
+/* ---------- page ---------- */
+.page { max-width: 708px; margin: 0 auto; padding: 96px 32px 96px; }
+.page-icon { width: 78px; height: 78px; margin: 0 0 16px; }
+.page-icon svg { width: 78px; height: 78px; }
+.page-title { font-size: 40px; font-weight: 700; line-height: 1.2; margin: 0 0 12px; letter-spacing: -0.01em; }
 
-.step { border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--line-2); padding: 18px 20px 20px; margin-bottom: 14px; }
-.step.done { box-shadow: 0 0 0 1px var(--line); }
-.step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.num {
-  width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 600; background: var(--hover); color: var(--ink-2);
+/* Notion page properties: grey name with its type icon, value beside it. */
+.properties { margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.property { display: flex; align-items: center; min-height: 34px; font-size: 14px; }
+.prop-name { flex: 0 0 160px; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.prop-icon { display: inline-flex; color: var(--ink-3); }
+.prop-value { color: var(--ink); }
+.lede { color: var(--ink-2); margin: 0 0 8px; }
+
+/* Notion select tags: grey, green or red, sized to their word. */
+.tag {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 3px;
+  font-size: 14px; font-weight: 400; line-height: 1; white-space: nowrap; vertical-align: 3px;
+  background: var(--tag-bg); color: var(--tag-ink);
 }
-.step.done .num { background: var(--good-soft); color: var(--good); }
-h2 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
-.badge { font-size: 12px; color: var(--ink-2); }
-.badge.ok { color: var(--good); }
+.tag:empty { display: none; }
+.tag.ok { background: var(--good-bg); color: var(--good); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
 
-.seg { display: inline-flex; padding: 2px; border-radius: var(--r); background: var(--hover); margin-bottom: 14px; }
-.seg button { font: inherit; border: 0; background: none; color: var(--ink-2); padding: 4px 14px; border-radius: 4px; cursor: pointer; }
-.seg button[aria-checked="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 0 0 1px var(--line-2), 0 1px 2px rgba(15, 15, 15, 0.08); }
+/* ---------- blocks ---------- */
+.block { margin: 0; }
+h2 { font-size: 24px; font-weight: 600; line-height: 1.3; margin: 32px 0 6px; display: flex; align-items: center; gap: 10px; }
+p { margin: 2px 0 8px; }
+.numbered { margin: 4px 0 12px; padding-left: 26px; }
+.numbered li { margin: 4px 0; padding-left: 2px; }
 
-label { display: block; font-size: 13px; font-weight: 500; color: var(--ink); margin: 0 0 4px; }
-.row { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-.row label { flex: 1 1 180px; }
-.row select, .row input { margin-top: 4px; }
+/* Notion callout: tinted block, emoji, text. */
+.callout { display: flex; gap: 10px; padding: 14px 16px 14px 12px; margin: 8px 0; border-radius: var(--r); background: var(--bg-3); font-size: 15px; }
+.callout-icon { font-size: 18px; line-height: 1.3; flex: none; width: 24px; text-align: center; }
+
+/* Notion's tab switcher: underlined text, not a pill track. */
+.tabs { display: flex; gap: 16px; margin: 4px 0 16px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  font: inherit; font-size: 14px; background: none; border: none; color: var(--ink-2); cursor: pointer;
+  padding: 6px 2px 8px; margin-bottom: -1px; border-bottom: 2px solid transparent;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-checked="true"] { color: var(--ink); font-weight: 500; border-bottom-color: var(--ink); }
+
+/* ---------- fields ---------- */
+label { display: block; font-size: 14px; font-weight: 500; color: var(--ink-2); margin: 14px 0 6px; }
+.row { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+.row label { flex: 1 1 200px; }
+.row select, .row input { margin-top: 6px; }
 input[type="text"], input[type="password"], select, textarea {
-  display: block; width: 100%; height: 34px; padding: 0 10px; border-radius: var(--r); border: 0; box-shadow: 0 0 0 1px var(--line-2);
-  font: inherit; font-weight: 400; background: var(--bg); color: var(--ink); outline: none;
+  display: block; width: 100%; height: 34px; padding: 0 10px; border-radius: var(--r); border: 0;
+  box-shadow: inset 0 0 0 1px var(--line-2); background: var(--field);
+  font: inherit; font-size: 14px; font-weight: 400; color: var(--ink); outline: none;
 }
+select { background: var(--bg); box-shadow: var(--button-shadow); }
 textarea { height: auto; padding: 8px 10px; resize: vertical; line-height: 1.5; }
-input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--accent-soft); }
+input:focus, select:focus, textarea:focus { box-shadow: var(--focus); }
 .key-row { display: flex; gap: 6px; }
-.key-row input { flex: 1; font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 13px; }
+.key-row input { flex: 1; font-family: var(--mono); font-size: 13px; }
 
+/* Notion buttons: white with an inset hairline, or blue for the one primary action. */
 button { font: inherit; cursor: pointer; }
-.ghost { height: 34px; padding: 0 12px; border-radius: var(--r); border: 0; background: var(--bg); color: var(--ink); box-shadow: 0 0 0 1px var(--line-2); white-space: nowrap; }
-.ghost:hover { background: var(--hover); }
-.primary { height: 34px; padding: 0 16px; border-radius: var(--r); border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 500; }
-.primary:hover { background: var(--accent-hover); }
+.button {
+  height: 34px; padding: 0 12px; border-radius: var(--r); border: 0; background: var(--bg); color: var(--ink);
+  box-shadow: var(--button-shadow); font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.button:hover { background: var(--hover); }
+.button.primary { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
+.button.primary:hover { background: var(--accent-hover); }
 .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 
-.help { color: var(--ink-2); font-size: 13px; margin: 6px 0 0; }
-.step > .help:first-of-type { margin-top: 0; }
-.how { color: var(--ink-2); font-size: 13px; padding-left: 20px; margin: 10px 0 14px; }
-.how li { margin: 3px 0; }
-.check { font-size: 13px; margin: 10px 0 0; min-height: 1px; }
+.check { font-size: 14px; margin: 10px 0 0; min-height: 1px; }
 .check:empty { margin: 0; }
-.check.ok { color: var(--good); }
-.check.err { color: var(--bad); }
+.check.ok { color: var(--good-text); }
+.check.err { color: var(--bad-text); }
 .check.wait { color: var(--ink-2); }
-.pages { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.pages li { background: var(--hover); border-radius: 4px; padding: 1px 7px; }
 
-.keys { margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
-.keys div { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
-.keys dt { flex: 0 0 210px; font-weight: 500; }
-.keys dd { margin: 0; color: var(--ink-2); flex: 1 1 200px; }
-kbd { font: inherit; font-size: 12px; padding: 0 5px; border-radius: 4px; box-shadow: 0 0 0 1px var(--line-2), 0 1px 0 var(--line-2); background: var(--bg); }
+/* Page mentions, as Notion draws a linked page inline. */
+.pages { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 14px; }
+.pages li { display: inline-flex; align-items: center; gap: 4px; }
+.pages li::before { content: "📄"; font-size: 13px; }
+.pages li span { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
 
-.prefs { margin: 22px 0 0; }
-.prefs summary { cursor: pointer; font-weight: 600; padding: 4px 0; list-style-position: outside; }
-.toggles { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 16px; }
-.toggle { display: flex; gap: 10px; align-items: flex-start; padding: 8px 6px; border-radius: var(--r); font-weight: 400; margin: 0; cursor: pointer; }
-.toggle:hover { background: var(--hover); }
-.toggle input { margin: 3px 0 0; width: 14px; height: 14px; flex: none; accent-color: var(--accent); }
-.toggle small { display: block; color: var(--ink-2); font-size: 12px; }
+/* Notion simple table. */
+.table-wrap { overflow-x: auto; margin: 8px 0; }
+.simple-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.simple-table td { border: 1px solid var(--line-2); padding: 7px 10px; vertical-align: top; }
+.simple-table td:first-child { width: 42%; font-weight: 500; }
+kbd { font: inherit; font-size: 12px; padding: 1px 5px; border-radius: var(--r); box-shadow: var(--button-shadow); background: var(--bg); }
 
-footer { display: flex; gap: 12px; align-items: baseline; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
-.saved { color: var(--good); min-width: 40px; }
+/* ---------- settings rows ---------- */
+.settings { margin: 6px 0 4px; }
+.setting {
+  display: flex; align-items: center; gap: 16px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--line);
+  font-size: 14px; font-weight: 400; color: var(--ink); cursor: pointer;
+}
+.setting > span { flex: 1; }
+.setting small { display: block; color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+/* Notion's switch. */
+.switch {
+  appearance: none; -webkit-appearance: none; margin: 0; flex: none; cursor: pointer;
+  width: 30px; height: 18px; border-radius: 44px; background: var(--switch-off); position: relative;
+  transition: background 200ms ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 1px 2px rgba(15, 15, 15, 0.2); transition: transform 200ms ease;
+}
+.switch:checked { background: var(--switch-on); }
+.switch:checked::after { transform: translateX(12px); }
+.switch:disabled { opacity: 0.4; cursor: default; }
+.switch:focus-visible { outline: none; box-shadow: var(--focus); }
+
+footer { display: flex; gap: 12px; align-items: baseline; margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+.saved { color: var(--good-text); min-width: 40px; }

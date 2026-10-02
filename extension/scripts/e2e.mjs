@@ -252,7 +252,7 @@ try {
     await setup.goto(`chrome-extension://${extId}/options.html?welcome=1`);
   }
   await setup.waitForLoadState();
-  eq("setup shows the version", (await setup.locator("[data-version]").textContent()).trim(), `Version ${version}`);
+  eq("setup shows the version", (await setup.locator("[data-version]").textContent()).trim(), version);
   await setup.waitForTimeout(300);
   eq("the key field has focus on a fresh install", await setup.evaluate(() => document.activeElement?.id), "anthropicApiKey");
 
@@ -267,7 +267,12 @@ try {
   await setup.fill("#notionToken", "ntn_good");
   await setup.waitForSelector("#check-notion.ok", { timeout: 5000 });
   check("Notion check lists the pages it can see", (await setup.locator("#notion-pages li").allTextContents()).includes("Roadmap"));
-  await setup.click("#prefs summary");
+  check("a rejected-then-fixed key leaves no red tag", !(await setup.locator("#prop-ai.bad").count()));
+  eq("the page properties show both connections", [await setup.textContent("#prop-ai"), await setup.textContent("#prop-notion")], ["Connected", "Connected"]);
+  await setup.click("label.setting:has(#bulkEdit)");
+  await setup.waitForTimeout(400);
+  eq("a settings row toggles its switch", await setup.evaluate(() => chrome.storage.local.get("settings").then((s) => s.settings.bulkEdit)), false);
+  await setup.click("label.setting:has(#bulkEdit)");
   await setup.waitForTimeout(400);
   const saved = await setup.evaluate(() => chrome.storage.local.get("settings").then((s) => s.settings));
   eq("settings save without a Save button", [saved?.anthropicApiKey, saved?.notionToken, saved?.anthropicModel], ["sk-ant-good-key", "ntn_good", "claude-opus-5-5"]);

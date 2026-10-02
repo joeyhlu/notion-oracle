@@ -9,9 +9,15 @@ function quote(value: unknown, max = 48): string {
   return `“${text.length > max ? `${text.slice(0, max)}…` : text}”`;
 }
 
+/** The desktop app's CLIs report MCP tools as mcp__<server>__<tool>; the labels key on <tool>. */
+function bareName(name: string): string {
+  return name.replace(/^mcp__.+?__/, "");
+}
+
 /** What a tool is doing, in the present-perfect a reader expects once it has finished. */
-export function describeTool(name: string, input: unknown): string {
+export function describeTool(qualifiedName: string, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>;
+  const name = bareName(qualifiedName);
   switch (name) {
     case "read_current_page": return "Read this page";
     case "get_selection": return "Read your selection";
@@ -34,11 +40,25 @@ export function describeTool(name: string, input: unknown): string {
     case "append_to_page": return "Added to a page";
     case "web_search": return i.query ? `Searched the web for ${quote(i.query)}` : "Searched the web";
     case "web_fetch": return "Read a web page";
+    // The desktop app's calendar tools.
+    case "calendar_list_calendars": return "Listed your calendars";
+    case "calendar_list_events": return "Checked your calendar";
+    case "calendar_find_events": return i.query ? `Looked for ${quote(i.query)} on your calendar` : "Looked through your calendar";
+    case "calendar_create_event":
+    case "calendar_create_event_by_keystrokes": return i.title ? `Added ${quote(i.title)} to your calendar` : "Added a calendar event";
+    case "calendar_update_event": return i.match ? `Changed ${quote(i.match)} on your calendar` : "Changed a calendar event";
+    case "calendar_delete_event": return i.match ? `Deleted ${quote(i.match)} from your calendar` : "Deleted a calendar event";
+    case "calendar_move_event": return "Moved an event to another calendar";
+    case "calendar_set_default_calendar": return "Set your default calendar";
+    case "calendar_status": return "Checked calendar access";
+    case "calendar_open":
+    case "calendar_open_date": return "Opened Notion Calendar";
     default: return name.replace(/_/g, " ");
   }
 }
 
 /** Whether a tool changes anything, which the activity line marks so edits stand out. */
-export function isWriteTool(name: string): boolean {
-  return /^(insert|replace|create|update|set|delete|append)_/.test(name);
+export function isWriteTool(qualifiedName: string): boolean {
+  const name = bareName(qualifiedName).replace(/^calendar_/, "");
+  return /^(insert|replace|create|update|set|delete|append|move)_/.test(name);
 }

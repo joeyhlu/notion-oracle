@@ -8,22 +8,23 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <main>
-    <header class="top">
-      <span id="mark" class="mark"></span>
-      <h1>Oracle</h1>
-      <span class="version" data-version></span>
-    </header>
+  <!-- Drawn as a Notion page: icon, title, properties, then blocks. -->
+  <main class="page">
+    <div class="page-icon" id="mark"></div>
+    <h1 class="page-title">Oracle</h1>
+
+    <div class="properties">
+      <div class="property"><span class="prop-name"><span class="prop-icon" data-icon="status"></span>AI</span><span class="prop-value"><span class="tag" id="prop-ai">Checking</span></span></div>
+      <div class="property"><span class="prop-name"><span class="prop-icon" data-icon="status"></span>Notion</span><span class="prop-value"><span class="tag" id="prop-notion">Checking</span></span></div>
+      <div class="property"><span class="prop-name"><span class="prop-icon" data-icon="hash"></span>Version</span><span class="prop-value" data-version></span></div>
+    </div>
+
     <p class="lede" id="lede">Notion AI on your own Claude or ChatGPT key. Three steps, about a minute.</p>
 
     <!-- Step 1 -->
-    <section class="step" id="step-ai">
-      <div class="step-head">
-        <span class="num">1</span>
-        <h2>Connect an AI</h2>
-        <span class="badge" id="badge-ai"></span>
-      </div>
-      <div class="seg" role="radiogroup" aria-label="AI provider">
+    <section class="block" id="step-ai">
+      <h2>Connect an AI <span class="tag" id="badge-ai"></span></h2>
+      <div class="tabs" role="radiogroup" aria-label="AI provider">
         <button type="button" role="radio" data-provider="anthropic">Claude</button>
         <button type="button" role="radio" data-provider="openai">ChatGPT</button>
       </div>
@@ -32,9 +33,9 @@
         <label for="anthropicApiKey">Anthropic API key</label>
         <div class="key-row">
           <input type="password" id="anthropicApiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-          <button type="button" class="ghost" data-reveal="anthropicApiKey">Show</button>
+          <button type="button" class="button" data-reveal="anthropicApiKey">Show</button>
         </div>
-        <p class="help">No key yet? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Create one at console.anthropic.com</a>, then paste it here. It is pay-as-you-go and separate from a Claude.ai subscription.</p>
+        <div class="callout"><span class="callout-icon">💡</span><div>No key yet? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Create one at console.anthropic.com</a> and paste it here. It is pay-as-you-go, separate from a Claude.ai subscription.</div></div>
         <div class="row">
           <label>Model
             <select id="anthropicModel"></select>
@@ -53,9 +54,9 @@
         <label for="openaiApiKey">OpenAI API key</label>
         <div class="key-row">
           <input type="password" id="openaiApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
-          <button type="button" class="ghost" data-reveal="openaiApiKey">Show</button>
+          <button type="button" class="button" data-reveal="openaiApiKey">Show</button>
         </div>
-        <p class="help">No key yet? <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Create one at platform.openai.com</a>, then paste it here. It is pay-as-you-go and separate from a ChatGPT subscription.</p>
+        <div class="callout"><span class="callout-icon">💡</span><div>No key yet? <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Create one at platform.openai.com</a> and paste it here. It is pay-as-you-go, separate from a ChatGPT subscription.</div></div>
         <div class="row">
           <label>Model
             <input type="text" id="openaiModel" list="openai-models" spellcheck="false">
@@ -67,14 +68,10 @@
     </section>
 
     <!-- Step 2 -->
-    <section class="step" id="step-notion">
-      <div class="step-head">
-        <span class="num">2</span>
-        <h2>Connect Notion</h2>
-        <span class="badge" id="badge-notion"></span>
-      </div>
-      <p class="help">Optional. Without it Oracle works on the page you have open. With it, Oracle can search your workspace, read other pages, create pages, add calendar entries and fill database columns.</p>
-      <ol class="how">
+    <section class="block" id="step-notion">
+      <h2>Connect Notion <span class="tag" id="badge-notion"></span></h2>
+      <p>Optional. Without it Oracle works on the page you have open. With it, Oracle can search your workspace, read other pages, create pages, add calendar entries and fill database columns.</p>
+      <ol class="numbered">
         <li><a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">Open Notion integrations</a>, choose <b>New integration</b>, name it Oracle, and save.</li>
         <li>Copy its <b>Internal Integration Secret</b> and paste it below.</li>
         <li>In Notion, open a top-level page, choose <b>•••</b> → <b>Connections</b>, and add Oracle. Pages under it come along.</li>
@@ -82,48 +79,48 @@
       <label for="notionToken">Integration secret</label>
       <div class="key-row">
         <input type="password" id="notionToken" placeholder="ntn_…" autocomplete="off" spellcheck="false">
-        <button type="button" class="ghost" data-reveal="notionToken">Show</button>
-        <button type="button" class="ghost" id="recheck-notion">Check again</button>
+        <button type="button" class="button" data-reveal="notionToken">Show</button>
+        <button type="button" class="button" id="recheck-notion">Check again</button>
       </div>
       <p class="check" id="check-notion" role="status"></p>
       <ul class="pages" id="notion-pages" hidden></ul>
     </section>
 
     <!-- Step 3 -->
-    <section class="step" id="step-try">
-      <div class="step-head">
-        <span class="num">3</span>
-        <h2>Use it in Notion</h2>
+    <section class="block" id="step-try">
+      <h2>Use it in Notion</h2>
+      <div class="table-wrap">
+        <table class="simple-table">
+          <tr><td>Select text, then <b>Ask AI</b></td><td>Improve, shorten, translate, change tone, explain</td></tr>
+          <tr><td><kbd data-mod></kbd> <kbd>J</kbd> in a page</td><td>The AI menu at your cursor: continue writing, or draft anything</td></tr>
+          <tr><td><kbd data-mod></kbd> <kbd>Shift</kbd> <kbd>Space</kbd></td><td>The chat: ask about the page or your whole workspace</td></tr>
+        </table>
       </div>
-      <dl class="keys">
-        <div><dt>Select text, then <b>Ask AI</b></dt><dd>Improve, shorten, translate, change tone, explain</dd></div>
-        <div><dt><kbd data-mod></kbd> <kbd>J</kbd> in a page</dt><dd>Open the AI menu at your cursor to write or draft</dd></div>
-        <div><dt><kbd data-mod></kbd> <kbd>Shift</kbd> <kbd>Space</kbd></dt><dd>Open the chat: ask about the page or your workspace</dd></div>
-      </dl>
-      <p class="help">Pin Oracle so it is one click away: open the puzzle-piece menu in the browser toolbar and pin <b>Notion Oracle</b>.</p>
+      <div class="callout"><span class="callout-icon">📌</span><div>Pin Oracle so it is one click away: open the puzzle-piece menu in the browser toolbar and pin <b>Notion Oracle</b>.</div></div>
       <div class="actions">
-        <button type="button" class="primary" id="open-notion">Open Notion</button>
-        <button type="button" class="ghost" id="open-shortcuts">Change shortcuts</button>
+        <button type="button" class="button primary" id="open-notion">Open Notion</button>
+        <button type="button" class="button" id="open-shortcuts">Change shortcuts</button>
       </div>
     </section>
 
-    <details class="prefs" id="prefs">
-      <summary>Preferences</summary>
-      <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="webSearch"><span><b>Search the web</b><small>Claude can look things up online when a question needs it.</small></span></label>
-        <label class="toggle"><input type="checkbox" id="workspaceSearch"><span><b>Search inside pages</b><small>Answer questions from what your pages say, not just their titles. Needs Notion connected.</small></span></label>
-        <label class="toggle"><input type="checkbox" id="bulkEdit"><span><b>Fill database columns</b><small>"Summarize every row", "tag these by topic". Needs Notion connected.</small></span></label>
-        <label class="toggle"><input type="checkbox" id="aiShortcut"><span><b><kbd data-mod></kbd> <kbd>J</kbd> opens the AI menu</b><small>Like Notion AI. Turn off to keep Notion's own shortcut.</small></span></label>
-        <label class="toggle"><input type="checkbox" id="selectionButton"><span><b>Ask AI button on selected text</b></span></label>
-        <label class="toggle"><input type="checkbox" id="floatingButton"><span><b>Oracle button in the corner of Notion</b></span></label>
+    <!-- Preferences: Notion's settings rows, label on the left, switch on the right. -->
+    <section class="block" id="prefs">
+      <h2>Preferences</h2>
+      <div class="settings">
+        <label class="setting"><span><b>Search the web</b><small>Claude can look things up online when a question needs it.</small></span><input type="checkbox" class="switch" id="webSearch"></label>
+        <label class="setting"><span><b>Search inside pages</b><small>Answer from what your pages say, not just their titles. Needs Notion connected.</small></span><input type="checkbox" class="switch" id="workspaceSearch"></label>
+        <label class="setting"><span><b>Fill database columns</b><small>"Summarize every row", "tag these by topic". Needs Notion connected.</small></span><input type="checkbox" class="switch" id="bulkEdit"></label>
+        <label class="setting"><span><b><kbd data-mod></kbd> <kbd>J</kbd> opens the AI menu</b><small>Like Notion AI. Turn off to keep Notion's own shortcut.</small></span><input type="checkbox" class="switch" id="aiShortcut"></label>
+        <label class="setting"><span><b>Ask AI button on selected text</b><small>Shows under any text you select.</small></span><input type="checkbox" class="switch" id="selectionButton"></label>
+        <label class="setting"><span><b>Oracle button in the corner</b><small>Opens the chat. The shortcut works either way.</small></span><input type="checkbox" class="switch" id="floatingButton"></label>
       </div>
       <label for="customInstructions">Always tell Oracle</label>
       <textarea id="customInstructions" rows="3" placeholder="Reply in French. My tasks live in the Tasks database. Keep summaries under five bullets."></textarea>
-    </details>
+    </section>
 
     <footer>
       <span id="saved" class="saved" role="status"></span>
-      <span class="privacy">Your keys stay in this browser. They are sent only to the AI company you chose and to Notion.</span>
+      <span class="privacy">Changes save as you type. Your keys stay in this browser and go only to the AI company you chose and to Notion.</span>
     </footer>
   </main>
   <script src="options.js"></script>

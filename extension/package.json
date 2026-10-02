@@ -1,6 +1,6 @@
 {
   "name": "notion-oracle",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Notion AI on your own Claude or ChatGPT key, as a browser extension.",

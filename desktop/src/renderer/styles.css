@@ -1,107 +1,132 @@
 /*
  * Design notes
  *
- * This is a utility panel someone opens forty times a day, so the job is to disappear, not to be
- * admired. Two rewrites went the other way — a Notion pastiche, then a Claude one — and both
- * still read as generated, because the tell is not the palette. It is display typography and
- * generous spacing on something that should be dense and quiet.
+ * Oracle lives beside Notion all day, so it is drawn in Notion's own visual language: not an
+ * impression of it, the actual components at their actual density. Two earlier passes missed
+ * because they reached for a mood (a palette, a serif, generous space) instead.
  *
- * So:
- *   - no serif, no display sizes. Headings are 13px semibold, the same family as everything else.
- *     A serif heading on warm cream with a terracotta accent is the single most recognisable
- *     signature of a generated interface; it is exactly what was here before.
- *   - 13px base and tight rhythm. Real desktop tools are compact. Space is spent where it aids
- *     scanning — between groups — not uniformly.
- *   - warm neutrals, because the panel sits next to Notion all day and a cold grey is harsher
- *     than it needs to be. Greys are the ink at low alpha so surfaces tint against their ground.
- *   - colour carries meaning only: the send button, links, and status. Nothing is coloured to
- *     look designed.
- *   - modest radii, one hairline border weight, one quiet shadow.
- *
- * Two accent tokens, because one cannot do both jobs: the fill sits behind white text and must be
- * dark enough for it (#b5532f, 4.9:1); a link sits on the page and in dark mode must be light
- * enough for the opposite (#e08b6e, 5.8:1).
+ *   - Notion's greys: ink #37352f, secondary ink at 72%, hairlines at 9% and 16%, hover at 6%.
+ *     Dark is #191919 / #202020 / #252525 with white ink at 86%.
+ *   - 14px UI text, 12px meta. Headings are Notion's settings-section style: 14px semibold over a
+ *     hairline. No display type in a 400px panel.
+ *   - Notion's components: toggle lists with a solid triangle, coloured status pills, switches,
+ *     grey callouts with an emoji, 4px-radius buttons with an inset hairline, menu rows 28px tall.
+ *   - Blue is the one colour, as in Notion. #2383e2 is Notion's, but white on it is 3.9:1, so
+ *     fills and link text use #1c74d4 (4.7:1); switches and focus rings, which carry no text, keep
+ *     #2383e2. Dark links use Notion's dark blue #529cca.
+ *   - Every selector is declared once per context; tests/css-rules.ts enforces it.
  */
 
 :root {
-  --ink: #1f1e1d;
-  --ink-2: #5e5d59;
-  --ink-3: #8b8a83;
-  --paper: #faf9f5;
-  --paper-2: #f0eee6;
-  --line: rgba(31, 30, 29, 0.10);
-  --line-2: rgba(31, 30, 29, 0.18);
-  --wash: rgba(31, 30, 29, 0.05);
-  --wash-2: rgba(31, 30, 29, 0.09);
-  --accent: #b5532f;            /* fill */
+  --ink: #37352f;
+  --ink-2: rgba(55, 53, 47, 0.72);
+  --ink-3: rgba(55, 53, 47, 0.46);
+  --bg: #ffffff;
+  --bg-2: #f7f7f5;
+  --bg-3: #f1f1ef;
+  --line: rgba(55, 53, 47, 0.09);
+  --line-2: rgba(55, 53, 47, 0.16);
+  --hover: rgba(55, 53, 47, 0.06);
+  --active: rgba(55, 53, 47, 0.1);
+  --field: rgba(242, 241, 238, 0.6);
+  --accent: #1c74d4;
   --accent-ink: #ffffff;
-  --accent-hover: #a64a2a;
-  --accent-text: #b5532f;       /* links */
-  --accent-soft: rgba(217, 119, 87, 0.18);
-  --good: #3b7a57;
-  --good-soft: rgba(59, 122, 87, 0.13);
-  --bad: #b94a3b;
-  --bad-soft: rgba(185, 74, 59, 0.12);
-  --bubble: #f0eee6;
-  --shadow: 0 0 0 1px rgba(31, 30, 29, 0.07), 0 4px 16px rgba(31, 30, 29, 0.10);
+  --accent-hover: #1a6fcb;
+  --accent-text: #1c74d4;
+  --accent-soft: rgba(35, 131, 226, 0.14);
+  --switch-on: #2383e2;
+  --switch-off: rgba(135, 131, 120, 0.3);
+  --focus: 0 0 0 1px rgba(35, 131, 226, 0.57) inset, 0 0 0 2px rgba(35, 131, 226, 0.35);
+  --good: #2b593f;
+  --good-bg: #dbeddb;
+  --bad: #c4423d;
+  --bad-ink: #5d1715;
+  --bad-bg: #ffe2dd;
+  --tag-ink: #32302c;
+  --tag-bg: #e3e2e0;
+  --bubble: #f1f1ef;
+  --tip-bg: #0f0f0f;
+  --shadow: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1), 0 9px 24px rgba(15, 15, 15, 0.2);
+  --button-shadow: inset 0 0 0 1px rgba(15, 15, 15, 0.1), 0 1px 2px rgba(15, 15, 15, 0.1);
 
-  --r: 5px;        /* controls */
-  --r-2: 7px;      /* containers */
+  --r: 4px;        /* controls */
+  --r-2: 6px;      /* menus, cards */
   --r-panel: 10px; /* the window */
 
   --t: 100ms ease;
 
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Helvetica, Arial, sans-serif;
+  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji";
+  --mono: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ink: #f0eee6;
-    --ink-2: #b0aea5;
-    --ink-3: #85837b;
-    --paper: #262624;
-    --paper-2: #30302e;
-    --line: rgba(240, 238, 230, 0.11);
-    --line-2: rgba(240, 238, 230, 0.2);
-    --wash: rgba(240, 238, 230, 0.06);
-    --wash-2: rgba(240, 238, 230, 0.11);
-    --accent: #b5532f;
+    --ink: rgba(255, 255, 255, 0.86);
+    --ink-2: rgba(255, 255, 255, 0.58);
+    --ink-3: rgba(255, 255, 255, 0.36);
+    --bg: #191919;
+    --bg-2: #202020;
+    --bg-3: #2c2c2c;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-2: rgba(255, 255, 255, 0.14);
+    --hover: rgba(255, 255, 255, 0.055);
+    --active: rgba(255, 255, 255, 0.09);
+    --field: rgba(255, 255, 255, 0.055);
+    --accent: #1c74d4;
     --accent-ink: #ffffff;
-    --accent-hover: #c25d38;
-    --accent-text: #e08b6e;
-    --accent-soft: rgba(224, 139, 110, 0.22);
-    --good: #7fbf98;
-    --good-soft: rgba(127, 191, 152, 0.16);
-    --bad: #e08373;
-    --bad-soft: rgba(224, 131, 115, 0.16);
-    --bubble: #383836;
-    --shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 32px rgba(0, 0, 0, 0.45);
+    --accent-hover: #2383e2;
+    --accent-text: #529cca;
+    --accent-soft: rgba(35, 131, 226, 0.2);
+    --switch-on: #2383e2;
+    --switch-off: rgba(202, 204, 206, 0.3);
+    --focus: 0 0 0 1px rgba(35, 131, 226, 0.7) inset, 0 0 0 2px rgba(35, 131, 226, 0.45);
+    --good: rgba(255, 255, 255, 0.86);
+    --good-bg: #2b593f;
+    --bad: #e9746e;
+    --bad-ink: rgba(255, 255, 255, 0.86);
+    --bad-bg: #6e3630;
+    --tag-ink: rgba(255, 255, 255, 0.86);
+    --tag-bg: #4a4a4a;
+    --bubble: #2c2c2c;
+    --tip-bg: #3a3a3a;
+    --shadow: 0 0 0 1px rgba(15, 15, 15, 0.1), 0 3px 6px rgba(15, 15, 15, 0.2), 0 9px 24px rgba(15, 15, 15, 0.4);
+    --button-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.094), 0 1px 2px rgba(15, 15, 15, 0.2);
   }
 }
 
 :root[data-theme="dark"] {
-  --ink: #f0eee6;
-  --ink-2: #b0aea5;
-  --ink-3: #85837b;
-  --paper: #262624;
-  --paper-2: #30302e;
-  --line: rgba(240, 238, 230, 0.11);
-  --line-2: rgba(240, 238, 230, 0.2);
-  --wash: rgba(240, 238, 230, 0.06);
-  --wash-2: rgba(240, 238, 230, 0.11);
-  --accent: #b5532f;
+  --ink: rgba(255, 255, 255, 0.86);
+  --ink-2: rgba(255, 255, 255, 0.58);
+  --ink-3: rgba(255, 255, 255, 0.36);
+  --bg: #191919;
+  --bg-2: #202020;
+  --bg-3: #2c2c2c;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --hover: rgba(255, 255, 255, 0.055);
+  --active: rgba(255, 255, 255, 0.09);
+  --field: rgba(255, 255, 255, 0.055);
+  --accent: #1c74d4;
   --accent-ink: #ffffff;
-  --accent-hover: #c25d38;
-  --accent-text: #e08b6e;
-  --accent-soft: rgba(224, 139, 110, 0.22);
-  --good: #7fbf98;
-  --good-soft: rgba(127, 191, 152, 0.16);
-  --bad: #e08373;
-  --bad-soft: rgba(224, 131, 115, 0.16);
-  --bubble: #383836;
-  --shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 32px rgba(0, 0, 0, 0.45);
+  --accent-hover: #2383e2;
+  --accent-text: #529cca;
+  --accent-soft: rgba(35, 131, 226, 0.2);
+  --switch-on: #2383e2;
+  --switch-off: rgba(202, 204, 206, 0.3);
+  --focus: 0 0 0 1px rgba(35, 131, 226, 0.7) inset, 0 0 0 2px rgba(35, 131, 226, 0.45);
+  --good: rgba(255, 255, 255, 0.86);
+  --good-bg: #2b593f;
+  --bad: #e9746e;
+  --bad-ink: rgba(255, 255, 255, 0.86);
+  --bad-bg: #6e3630;
+  --tag-ink: rgba(255, 255, 255, 0.86);
+  --tag-bg: #4a4a4a;
+  --bubble: #2c2c2c;
+  --tip-bg: #3a3a3a;
+  --shadow: 0 0 0 1px rgba(15, 15, 15, 0.1), 0 3px 6px rgba(15, 15, 15, 0.2), 0 9px 24px rgba(15, 15, 15, 0.4);
+  --button-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.094), 0 1px 2px rgba(15, 15, 15, 0.2);
   color-scheme: dark;
 }
 
@@ -120,371 +145,377 @@
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body {
   font-family: var(--sans);
-  font-size: 13px; line-height: 1.5; letter-spacing: 0; color: var(--ink);
+  font-size: 14px; line-height: 1.5; color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
-button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
-a { color: var(--accent-text); text-underline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+a { color: var(--accent-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+svg { display: block; flex: none; }
+.mark { display: inline-flex; flex: none; }
 
 /* ---------- Collapsed pill ---------- */
 /*
  * NOTHING in the collapsed overlay may be a drag region. -webkit-app-region is inherited, and
  * an element the OS treats as a title bar has its clicks swallowed by the window manager before
- * the page ever sees them. Marking the body draggable and the pill no-drag ought to work, but on
- * a transparent frameless window it left the button dead in practice, so the collapsed pill is
- * simply not draggable. Move the window by its panel header instead.
+ * the page ever sees them. The collapsed pill is simply not draggable; move the window by its
+ * panel header instead.
  */
 .pill {
-  position: absolute; inset: 8px; border-radius: 11px; border: none;
-  background: var(--accent); color: var(--accent-ink); font-size: 19px; line-height: 1;
+  position: absolute; inset: 8px; border-radius: 11px; border: none; padding: 0;
+  background: #1f1e1d; color: #faf9f5; font-size: 19px; line-height: 1; overflow: hidden;
   box-shadow: var(--shadow);
   -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center;
   transition: transform var(--t);
 }
-.pill:hover { transform: scale(1.04); }
+.pill:hover { transform: translateY(-1px); }
 .pill:active { transform: scale(.97); }
+.pill svg { width: 100%; height: 100%; }
 body.expanded .pill { display: none; }
 body.collapsed .panel { display: none; }
 
 /* ---------- Panel ---------- */
 .panel {
-  position: absolute; inset: 0; background: var(--paper); border: 1px solid var(--line);
+  position: absolute; inset: 0; background: var(--bg);
   border-radius: var(--r-panel); box-shadow: var(--shadow);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .header {
-  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 11px;
-  border-bottom: 1px solid var(--line); -webkit-app-region: drag;
+  display: flex; align-items: center; gap: 2px; height: 44px; padding: 0 8px 0 12px;
+  -webkit-app-region: drag;
 }
 .header button { -webkit-app-region: no-drag; }
-.title { font-weight: 600; font-size: 13px; letter-spacing: -.005em; display: flex; align-items: center; gap: 7px; }
-/* A square mark reads sharper than a dot and echoes the radius scale. */
-.dot { width: 7px; height: 7px; border-radius: 50%; background: #d97757; display: inline-block; }
+.title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-right: 6px; }
 .model {
-  color: var(--ink-3); font-size: 11px; flex: 1; min-width: 0;
+  color: var(--ink-2); font-size: 12px; flex: 0 1 auto; min-width: 0; margin-right: auto;
+  padding: 1px 6px; border-radius: var(--r); background: var(--hover);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.model:empty { display: none; }
 .icon-btn {
-  background: none; border: none; border-radius: var(--r-2); width: 26px; height: 26px;
-  color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center;
-  font-size: 14px; transition: background var(--t), color var(--t);
+  background: none; border: none; border-radius: var(--r-2); width: 28px; height: 28px; padding: 0;
+  color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--t), color var(--t);
 }
-.icon-btn:hover { background: var(--wash); color: var(--ink); }
-.icon-btn:active { background: var(--wash-2); }
+.icon-btn:hover { background: var(--hover); color: var(--ink); }
+.icon-btn:active { background: var(--active); }
 
 /*
- * Tooltips. The native `title` takes about a second to appear and is drawn by the OS in a style
- * nothing else here shares; on a six-button row where the glyphs are the only labels, that delay
- * is the difference between a discoverable header and a guessing game. One word each.
- *
- * Drawn on the header rather than the button so it is not clipped by the button's own box, and
- * positioned from the button through a CSS variable set per child — a tooltip that escaped the
- * panel would be cut off by its overflow:hidden.
+ * Tooltips: Notion's black label, instant, one or two words. Positioned from the button and
+ * pulled inward at the right edge, since the panel's overflow:hidden would clip anything outside.
  */
 [data-tip] { position: relative; }
 [data-tip]::after {
   content: attr(data-tip);
-  position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-  padding: 4px 9px; border-radius: 7px; white-space: nowrap;
-  background: #1f1e1d; color: #f0eee6; font-size: 12px; font-weight: 400;
-  letter-spacing: 0; pointer-events: none; opacity: 0; transition: opacity 90ms ease 40ms;
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  padding: 3px 7px; border-radius: var(--r); white-space: nowrap;
+  background: var(--tip-bg); color: #ffffff; font-size: 12px; font-weight: 500; line-height: 1.4;
+  pointer-events: none; opacity: 0; transition: opacity 90ms ease 40ms;
   z-index: 5;
 }
 [data-tip]:hover::after { opacity: 1; }
-/* The last buttons sit against the right edge; pull their tooltips in so they stay on screen. */
 .header > [data-tip]:nth-last-child(-n+2)::after { left: auto; right: 0; transform: none; }
 
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ---------- Chat ---------- */
-.looking-at { font-size: 11px; color: var(--ink-3); padding: 8px 14px 0; }
-.looking-at strong { color: var(--ink-2); font-weight: 500; }
+.looking-at { font-size: 12px; color: var(--ink-2); padding: 0 16px 4px; }
+.looking-at strong { color: var(--ink); font-weight: 500; }
 
 .messages {
-  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 12px 13px;
-  display: flex; flex-direction: column; gap: 14px;
+  flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 8px 16px 16px;
+  display: flex; flex-direction: column; gap: 18px;
 }
-/* Left-aligned and top-anchored: a centred greeting floating in the middle of the panel is the
- * stock empty state, and it leaves the suggestions at the bottom looking unrelated to it. */
-.empty { color: var(--ink-2); max-width: 44ch; margin: 4px 0 0; line-height: 1.55; font-size: 13px; }
-.empty strong { display: block; color: var(--ink); font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-.msg { line-height: 1.55; word-wrap: break-word; }
+/* Notion AI's empty chat: its mark, one plain question, a line of help. Left-aligned, top-anchored. */
+.empty { color: var(--ink-2); margin: 12px 0 0; line-height: 1.5; font-size: 14px; }
+.empty .mark { margin-bottom: 10px; }
+.empty strong { display: block; color: var(--ink); font-weight: 600; font-size: 16px; margin-bottom: 2px; }
+.msg { line-height: 1.6; word-wrap: break-word; }
 .msg.user {
   align-self: flex-end; max-width: 86%; background: var(--bubble);
-  padding: 7px 11px; border-radius: 10px; border-bottom-right-radius: 4px; white-space: pre-wrap;
+  padding: 6px 12px; border-radius: 14px 14px 4px 14px; white-space: pre-wrap;
 }
-.msg.assistant .body p { margin: 0 0 9px; }
+.msg.assistant .body p { margin: 0 0 10px; }
 .msg.assistant .body p:last-child { margin-bottom: 0; }
 .msg.assistant .body h3, .msg.assistant .body h4, .msg.assistant .body h5 {
-  margin: 14px 0 5px; font-size: 13px; letter-spacing: -.01em;
+  margin: 16px 0 6px; font-size: 15px; font-weight: 600; line-height: 1.35;
 }
-.msg.assistant .body h3 { font-size: 14px; }
-.msg.assistant .body ul, .msg.assistant .body ol { margin: 5px 0 9px; padding-left: 20px; }
-.msg.assistant .body li { margin: 2px 0; }
+.msg.assistant .body h3 { font-size: 16px; }
+.msg.assistant .body ul, .msg.assistant .body ol { margin: 4px 0 10px; padding-left: 22px; }
+.msg.assistant .body li { margin: 3px 0; }
 .msg.assistant .body code {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
-  padding: .5px 4px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--hover); border-radius: var(--r); color: #eb5757;
+  padding: .15em .35em; font-size: 85%; font-family: var(--mono);
 }
 .msg.assistant .body pre {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
-  padding: 10px 11px; overflow-x: auto; font-size: 12px;
+  background: var(--bg-2); border-radius: var(--r);
+  padding: 12px 14px; overflow-x: auto; font-size: 13px;
 }
-.msg.assistant .body pre code { background: none; border: none; padding: 0; }
-.msg.assistant .body blockquote {
-  margin: 8px 0; padding-left: 11px; border-left: 2px solid var(--line-2); color: var(--ink-2);
-}
-.msg.assistant .body hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+.msg.assistant .body pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+.msg.assistant .body blockquote { margin: 6px 0 10px; padding-left: 12px; border-left: 3px solid currentColor; }
+.msg.assistant .body hr { border: none; border-top: 1px solid var(--line-2); margin: 14px 0; }
+.msg.assistant .body a { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
 
-/* Tool calls: a compact log, indented under the reply rather than competing with it. */
-.tools { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; }
-.tool {
-  font-size: 11.5px; color: var(--ink-2); background: var(--paper-2);
-  border: 1px solid var(--line); border-radius: var(--r-2); padding: 3px 8px;
-  display: flex; gap: 7px; align-items: baseline;
+/* What a reply did, as Notion AI shows it: a quiet list of readable steps above the answer. */
+.tools { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.tool { font-size: 13px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+.tool .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool .status { display: inline-flex; color: var(--good); width: 14px; justify-content: center; }
+.tool.running .status { color: var(--ink-3); }
+.tool.write .name { color: var(--ink); }
+.tool.error { color: var(--bad); }
+.tool.error .status { color: var(--bad); }
+.spinner {
+  width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--line-2); border-top-color: var(--ink-2);
+  animation: spin .8s linear infinite;
 }
-.tool .name {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--ink);
-}
-.tool.running .status::after { content: "…"; }
-.tool.error { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
-.tool .summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.thinking { color: var(--ink-3); font-size: 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.thinking { color: var(--ink-2); font-size: 13px; }
 .thinking::after { content: ""; animation: dots 1.2s steps(4, end) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
-.error { color: var(--bad); font-size: 12px; white-space: pre-wrap; }
-.actions { display: flex; gap: 6px; margin-top: 7px; }
+.error { color: var(--bad-ink); background: var(--bad-bg); border-radius: var(--r); padding: 8px 10px; font-size: 13px; white-space: pre-wrap; }
+.actions { display: flex; gap: 6px; margin-top: 8px; }
 
 /* ---------- Controls ---------- */
+/* Notion's secondary button: white, a hairline drawn inside, 4px corners. */
 .chip {
-  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r);
-  padding: 3px 9px; font-size: 12px; color: var(--ink-2);
-  transition: background var(--t), color var(--t), border-color var(--t);
+  border: none; background: var(--bg); border-radius: var(--r); box-shadow: var(--button-shadow);
+  height: 28px; padding: 0 10px; font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: background var(--t);
 }
-.chip:hover { background: var(--wash); border-color: var(--line-2); color: var(--ink); }
-/* The suggestions read as a deliberate row rather than loose buttons with a label that costs
- * one line. QUICK_ACTIONS is populated once and never cleared, so the label cannot outlive it. */
-.quick { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 13px 8px; }
-.quick::before {
-  flex-basis: 100%; content: "Try asking"; font-size: 11.5px; font-weight: 500;
-  color: var(--ink-3); margin-bottom: 1px;
+.chip:hover { background: var(--hover); }
+.chip:active { background: var(--active); }
+/* The suggestions: a menu of rows, as Notion AI lists them, shown only on the empty chat. */
+.quick { display: flex; flex-direction: column; padding: 0 8px 8px; }
+.quick::before { content: "Suggested"; font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 0 8px 4px; }
+.suggestion {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 8px;
+  border: none; background: none; border-radius: var(--r-2); text-align: left; color: var(--ink);
+  font-size: 14px; transition: background var(--t);
 }
+.suggestion:hover { background: var(--hover); }
+.suggestion svg { color: var(--ink-2); }
+.suggestion span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The composer: Notion AI's rounded box with the send button inside it. */
 .composer {
-  display: flex; gap: 7px; padding: 9px 12px; border-top: 1px solid var(--line);
-  align-items: flex-end;
+  display: flex; gap: 6px; margin: 4px 12px 0; padding: 6px 6px 6px 12px; align-items: flex-end;
+  border-radius: 12px; background: var(--bg); box-shadow: 0 0 0 1px var(--line-2), 0 1px 3px rgba(15, 15, 15, 0.04);
+  transition: box-shadow var(--t);
 }
+.composer:focus-within { box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--accent-soft); }
 .composer textarea {
-  flex: 1; resize: none; min-height: 34px; max-height: 160px; padding: 8px 10px;
-  border-radius: var(--r-2); border: 1px solid var(--line-2); background: var(--paper);
-  color: var(--ink); font: inherit; letter-spacing: inherit; line-height: 1.45; outline: none;
-  transition: border-color var(--t), box-shadow var(--t);
+  flex: 1; resize: none; min-height: 28px; max-height: 160px; padding: 4px 0;
+  border: none; background: none; color: var(--ink); font: inherit; line-height: 1.45; outline: none;
 }
 .composer textarea::placeholder { color: var(--ink-3); }
-.composer textarea:focus { border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft); }
 .send {
-  background: var(--accent); color: var(--accent-ink); border: none; border-radius: var(--r-2);
-  height: 34px; padding: 0 13px; font-size: 13px; font-weight: 500;
+  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 50%;
+  width: 28px; height: 28px; padding: 0; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
   transition: background var(--t);
 }
 .send:hover { background: var(--accent-hover); }
 .send:active { filter: brightness(.92); }
-.send.stop { background: var(--bad); }
-.hint { font-size: 11px; color: var(--ink-3); padding: 0 12px 9px; }
+.send.stop { background: #37352f; color: #ffffff; }
+.hint { font-size: 12px; color: var(--ink-3); padding: 6px 16px 10px; }
 
-/* ---------- Banner ---------- */
+/* ---------- Banner: a Notion callout ---------- */
 .banner {
-  display: flex; align-items: center; gap: 10px; margin: 10px 14px 0; padding: 8px 10px;
-  border: 1px solid var(--line); border-left: 2px solid var(--bad); border-radius: var(--r-2);
-  background: var(--paper-2); font-size: 12px;
+  display: flex; align-items: center; gap: 10px; margin: 4px 16px 4px; padding: 10px 12px;
+  border-radius: var(--r); background: var(--bad-bg); color: var(--bad-ink); font-size: 13px;
 }
+.banner::before { content: "⚠️"; font-size: 15px; }
 .banner span { flex: 1; }
 .banner-btn {
-  border: 1px solid var(--line-2); background: var(--paper); border-radius: var(--r-2);
-  padding: 3px 8px; font-size: 11.5px; white-space: nowrap; transition: background var(--t);
+  border: none; background: var(--bg); color: var(--ink); border-radius: var(--r); box-shadow: var(--button-shadow);
+  height: 26px; padding: 0 10px; font-size: 12px; font-weight: 500; white-space: nowrap; transition: background var(--t);
 }
-.banner-btn:hover { background: var(--wash); }
+.banner-btn:hover { background: var(--hover); }
 
-/* ---------- Scrolling views (setup, help) ---------- */
+/* ---------- Scrolling views (setup, help, history, changes) ---------- */
 /*
- * A column rather than a block so the footer can be pushed to the bottom on a short page (all
- * steps collapsed) while still scrolling away naturally on a long one. Children opt out of
- * shrinking: without that, an overflowing column squashes the steps instead of scrolling.
+ * A column rather than a block so the footer can be pushed to the bottom on a short page while
+ * still scrolling away naturally on a long one. Children opt out of shrinking: without that, an
+ * overflowing column squashes the steps instead of scrolling.
  */
-.view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px; }
+.view.scroll { display: flex; flex-direction: column; overflow-y: auto; padding: 0 16px; }
 .view.scroll > * { flex: none; }
-.view-head { padding: 13px 0 9px; }
-/* A heading, not a masthead. 400px of panel cannot afford display type. */
-.view-head h1 {
-  font-size: 13px; font-weight: 600; letter-spacing: -.005em;
-  color: var(--ink); margin: 0 0 3px;
-}
-.view.scroll .view-head p { margin: 0; color: var(--ink-2); font-size: 12.5px; }
-.view.scroll p { margin: 5px 0 9px; font-size: 12.5px;}
+/* Notion's settings section heading: 14px semibold over a hairline, a line of help under it. */
+.view-head { padding: 6px 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.view-head h1 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 0 0 2px; }
+.view.scroll .view-head p { margin: 0; color: var(--ink-2); font-size: 12px; }
+.view.scroll p { margin: 6px 0 10px; font-size: 13px; }
 .muted { color: var(--ink-2); font-size: 12px; }
 
 .view.scroll label {
-  display: block; font-weight: 550; margin: 11px 0 3px; font-size: 12px; color: var(--ink);
+  display: block; font-weight: 500; margin: 14px 0 4px; font-size: 12px; color: var(--ink-2);
 }
 .view.scroll input[type="text"], .view.scroll input[type="password"], .view.scroll textarea {
-  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r-2);
-  border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
-  background: var(--paper); color: var(--ink); outline: none;
-  transition: border-color var(--t), box-shadow var(--t);
+  display: block; width: 100%; height: 32px; padding: 0 10px; margin-top: 4px; border-radius: var(--r);
+  border: none; box-shadow: inset 0 0 0 1px var(--line-2); font: inherit; font-size: 14px; font-weight: 400;
+  background: var(--field); color: var(--ink); outline: none;
+  transition: box-shadow var(--t);
 }
+.view.scroll textarea { height: auto; padding: 6px 10px; line-height: 1.5; resize: vertical; }
 .view.scroll input[type="text"]:focus, .view.scroll input[type="password"]:focus,
-.view.scroll textarea:focus, .view.scroll select:focus {
-  border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent-soft);
-}
+.view.scroll textarea:focus, .view.scroll select:focus { box-shadow: var(--focus); }
 .view.scroll select {
-  display: block; width: 100%; padding: 6px 9px; border-radius: var(--r-2);
-  border: 1px solid var(--line); font: inherit; letter-spacing: inherit; font-weight: 400;
-  background: var(--paper); color: var(--ink); outline: none;
-  transition: border-color var(--t), box-shadow var(--t);
+  display: block; width: 100%; height: 32px; padding: 0 8px; margin-top: 4px; border-radius: var(--r);
+  border: none; box-shadow: var(--button-shadow); font: inherit; font-size: 14px; font-weight: 400;
+  background: var(--bg); color: var(--ink); outline: none;
 }
+/* A setting row: what it does on the left, Notion's switch on the right. */
 .view.scroll label.checkbox {
-  display: flex; align-items: flex-start; gap: 7px; font-weight: 400; color: var(--ink-2); font-size: 12.5px; line-height: 1.45;}
-.view.scroll label.checkbox input { width: auto; margin: 2px 0 0; accent-color: var(--accent); }
-#follow-note { margin-top: 3px; }
-#theme-note { margin-top: 4px; }
-
-/* Segmented control: one bordered track, the chosen segment filled solid. */
-.segmented {
-  display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-2);
-  overflow: hidden; background: var(--paper);
+  display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px;
+  font-weight: 400; color: var(--ink); font-size: 14px; line-height: 1.4; margin: 10px 0 2px;
 }
+.view.scroll label.checkbox input {
+  appearance: none; -webkit-appearance: none; margin: 0; flex: none; cursor: pointer;
+  width: 30px; height: 18px; border-radius: 44px; background: var(--switch-off); position: relative;
+  transition: background 200ms ease;
+}
+.view.scroll label.checkbox input::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 1px 2px rgba(15, 15, 15, 0.2); transition: transform 200ms ease;
+}
+.view.scroll label.checkbox input:checked { background: var(--switch-on); }
+.view.scroll label.checkbox input:checked::after { transform: translateX(12px); }
+.view.scroll label.checkbox input:focus-visible { box-shadow: var(--focus); outline: none; }
+#follow-note { margin-top: 2px; }
+#theme-note { margin-top: 6px; }
+
+/* Segmented control: Notion's grey track with the chosen segment raised. */
+.segmented { display: inline-flex; padding: 2px; border-radius: var(--r-2); background: var(--hover); gap: 2px; }
 .seg {
-  background: none; border: none; border-left: 1px solid var(--line);
-  padding: 4px 12px; font-size: 12px; color: var(--ink-2);
+  background: none; border: none; border-radius: var(--r); height: 26px;
+  padding: 0 12px; font-size: 13px; color: var(--ink-2);
   transition: background var(--t), color var(--t);
 }
-.seg:first-child { border-left: none; }
-.seg:hover { background: var(--wash); color: var(--ink); }
-.seg.active { background: var(--wash-2); color: var(--ink); font-weight: 500; }
-.seg.active:hover { background: var(--wash-2); }
+.seg:hover { color: var(--ink); }
+.seg.active { background: var(--bg); color: var(--ink); font-weight: 500; box-shadow: var(--button-shadow); }
+.seg.active:hover { background: var(--bg); }
 
-/* ---------- Setup steps ---------- */
-/*
- * One bordered list with dividers, not four floating cards. Four separate rounded boxes with gaps
- * between them is the shape that makes a settings screen read as generated; a single ruled list
- * is denser and puts the statuses in one column you can scan.
- */
-.step { border: 1px solid var(--line); border-top: none; background: var(--paper); }
-.step:first-of-type { border-top: 1px solid var(--line); border-radius: var(--r-2) var(--r-2) 0 0; }
-.step:last-of-type { border-radius: 0 0 var(--r-2) var(--r-2); }
+/* ---------- Setup steps: a Notion toggle list with status pills ---------- */
+.step { border-bottom: 1px solid var(--line); }
 .step-head {
-  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 11px;
-  background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 4px; margin: 2px 0;
+  background: none; border: none; border-radius: var(--r); text-align: left; font: inherit;
   transition: background var(--t);
 }
-.step-head:hover { background: var(--wash); }
-.step-title { font-weight: 500; font-size: 13px; }
+.step-head:hover { background: var(--hover); }
+.step-title { font-weight: 500; font-size: 14px; }
 .step-note {
-  color: var(--ink-3); font-size: 11.5px; flex: 1; text-align: right;
+  color: var(--ink-2); font-size: 12px; flex: 1; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.chev { color: var(--ink-3); font-size: 13px; transition: transform var(--t); }
-.step.open .chev { transform: rotate(90deg); }
-.step.open .step-head { background: transparent; border-bottom: 1px solid var(--line); }
-.step-body { display: none; padding: 2px 11px 13px; }
-.step.open .step-body { display: block; }
-.step-body > p:first-child { margin-top: 9px; }
-
-/* Status: a small tinted square, not a solid circle. Scans as a column of states. */
-.step-badge {
-  width: 17px; height: 17px; border-radius: var(--r); flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10.5px; font-weight: 700; line-height: 1;
-  background: var(--paper-2); color: var(--ink-3); border: 1px solid var(--line);
+/* Notion's toggle: a small solid triangle that turns to point down when open. */
+.chev {
+  width: 0; height: 0; flex: none; margin: 0 4px 0 2px; font-size: 0;
+  border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; border-left: 7px solid var(--ink-2);
+  transition: transform 150ms ease;
 }
-.step-badge.ok { background: var(--good-soft); color: var(--good); border-color: transparent; }
-.step-badge.warn { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
-.step-badge.optional { background: none; }
+.step.open .chev { transform: rotate(90deg); }
+.step-body { display: none; padding: 0 4px 14px 22px; }
+.step.open .step-body { display: block; }
+.step-body > p:first-child { margin-top: 2px; }
 
-.row { display: flex; flex-direction: column; gap: 7px; margin: 11px 0; }
-.radio { display: flex; align-items: center; gap: 7px; }
-.radio input { accent-color: var(--accent); margin: 0; }
-.status-card { border: 1px solid var(--line); border-radius: var(--r-2); padding: 9px 10px; margin-top: 11px; }
-.status-line { display: flex; gap: 7px; align-items: baseline; font-size: 12px; color: var(--ink-2); }
+/* Status, as a Notion select pill: grey, green or red, sized to its word. */
+.step-badge {
+  flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 3px;
+  font-size: 12px; font-weight: 400; line-height: 1; white-space: nowrap;
+  background: var(--tag-bg); color: var(--tag-ink);
+}
+.step-badge.ok { background: var(--good-bg); color: var(--good); }
+.step-badge.warn { background: var(--bad-bg); color: var(--bad-ink); }
+.step-badge.optional { background: var(--hover); color: var(--ink-2); }
+
+.row { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+/* Beats the generic `.view.scroll label`, which is for field captions, not choices. */
+.view.scroll label.radio { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 400; color: var(--ink); }
+.radio input { accent-color: var(--switch-on); margin: 0; }
+/* The AI status reads as a Notion callout: tinted block, emoji, the state in words. */
+.status-card { border-radius: var(--r); background: var(--bg-3); padding: 10px 12px; margin-top: 12px; }
+.status-line { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); }
 .status-line.ok { color: var(--good); }
 .status-line.bad { color: var(--bad); }
-.status-actions { display: flex; gap: 5px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
-.advanced { margin-top: 11px; font-size: 12px; }
-.advanced summary { cursor: pointer; color: var(--ink-3); font-size: 11.5px; }
-.advanced summary:hover { color: var(--ink-2); }
-.install-help { margin-top: 9px; }
+.status-actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+.advanced { margin-top: 12px; font-size: 13px; }
+.advanced summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.advanced summary:hover { color: var(--ink); }
+.install-help { margin-top: 10px; }
 .install-help pre {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
-  padding: 7px 9px; margin: 5px 0 0; font-size: 11.5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--bg-2); border-radius: var(--r);
+  padding: 8px 10px; margin: 6px 0 0; font-size: 12px; font-family: var(--mono);
   overflow-x: auto; user-select: all;
 }
-.steps { padding-left: 17px; font-size: 12.5px; color: var(--ink-2); margin: 8px 0; }
-.steps li { margin: 5px 0; }
-.steps strong { color: var(--ink); font-weight: 550; }
+.steps { padding-left: 20px; font-size: 13px; color: var(--ink); margin: 8px 0; }
+.steps li { margin: 4px 0; }
+.steps strong { font-weight: 600; }
 
 .setup-footer {
-  display: flex; align-items: center; gap: 9px; margin: auto -14px 0;
-  padding: 10px 14px; background: var(--paper); border-top: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px; margin: auto -16px 0;
+  padding: 10px 16px; background: var(--bg); border-top: 1px solid var(--line);
 }
+.setup-footer .send { width: auto; border-radius: var(--r); padding: 0 14px; font-size: 14px; font-weight: 500; }
 .quit { margin-left: auto; }
-.quit:hover { border-color: var(--bad); color: var(--bad); }
+.quit:hover { color: var(--bad); }
 
-/* ---------- Help ---------- */
-.faq-item { border-bottom: 1px solid var(--line); }
+/* ---------- Help: Notion toggle blocks ---------- */
+.faq-item { border-radius: var(--r); }
 .faq-q {
-  display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 9px 1px;
-  background: none; border: none; text-align: left; font: inherit; letter-spacing: inherit;
-  font-weight: 500; font-size: 13px; transition: color var(--t);
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 4px;
+  background: none; border: none; border-radius: var(--r); text-align: left; font: inherit;
+  font-weight: 500; font-size: 14px; transition: background var(--t);
 }
-.faq-q:hover { color: var(--accent-text); }
-.faq-q .chev { margin-left: auto; }
+.faq-q:hover { background: var(--hover); }
+.faq-q .chev { order: -1; }
 .faq-item.open .chev { transform: rotate(90deg); }
-.faq-item.open .faq-q { color: var(--ink); }
-.faq-a { display: none; padding: 0 1px 12px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+.faq-a { display: none; padding: 0 4px 12px 26px; font-size: 13px; line-height: 1.6; color: var(--ink); }
 .faq-item.open .faq-a { display: block; }
 .faq-a p { margin: 0 0 8px; }
 .faq-a p:last-child { margin-bottom: 0; }
-.faq-a strong { color: var(--ink); font-weight: 550; }
-.faq-a code {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2);
-  padding: .5px 4px; font-size: 11.5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
-}
+.faq-a strong { font-weight: 600; }
+.faq-a code { background: var(--hover); border-radius: var(--r); padding: .15em .35em; font-size: 85%; font-family: var(--mono); color: #eb5757; }
 
 /* ---------- Scrollbars ---------- */
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { background: var(--line); border: 3px solid transparent; background-clip: content-box; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--line-2); background-clip: content-box; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border: 3px solid transparent; background-clip: content-box; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
 ::-webkit-scrollbar-track { background: none; }
 
-/* ---------- Changes ---------- */
+/* ---------- History and changes: Notion list rows ---------- */
 .change {
-  display: flex; align-items: center; gap: 9px; padding: 9px 1px;
-  border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px; margin: 0 -6px;
+  border-radius: var(--r); flex-wrap: wrap; transition: background var(--t);
 }
-.change-main { flex: 1; min-width: 0; }
-.change-label { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.change-when { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
-.change-state { color: var(--ink-3); font-size: 11px; }
-.change.undone .change-label { color: var(--ink-3); text-decoration: line-through; }
-.change-error { flex-basis: 100%; color: var(--bad); font-size: 11.5px; }
+.change:hover { background: var(--hover); }
+.change.current { background: var(--active); }
+.change-main { flex: 1; min-width: 0; cursor: default; }
+.change-label { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.change-when { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.change-state { color: var(--ink-2); font-size: 12px; background: var(--hover); border-radius: 3px; padding: 1px 6px; }
+.change.undone .change-label { color: var(--ink-2); text-decoration: line-through; }
+.change-error { flex-basis: 100%; color: var(--bad); font-size: 12px; }
 
 /* The footnote under a reply: what the tools actually did, not what the reply claims. */
 .change-note {
-  display: flex; align-items: baseline; gap: 8px; margin-top: 8px; padding-top: 7px;
-  border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-3);
+  display: flex; align-items: baseline; gap: 8px; margin-top: 10px;
+  font-size: 13px; color: var(--ink-2);
 }
 .change-note-text { flex: 1; }
 .link-btn {
-  background: none; border: none; padding: 0; font-size: 11.5px; color: var(--accent-text);
-  text-decoration: underline; text-underline-offset: 2px;
+  background: none; border: none; padding: 0; font-size: 13px; color: var(--accent-text);
 }
+.link-btn:hover { text-decoration: underline; }
 .looking-at .selected { color: var(--accent-text); }
 .looking-at .warn { color: var(--bad); }
 
 /* The version, where you would go looking for it: beside Save, and under the Help heading. */
-.version { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.version { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .setup-footer .version { margin-left: auto; }
 .setup-footer .quit { margin-left: 10px; }
 
-/* Native controls default to a size meant for a full window; scale them to the panel. */
-.view.scroll input[type="checkbox"], .view.scroll input[type="radio"] { width: 14px; height: 14px; flex: none; }
+/* Native radios sized to the panel; checkboxes are switches above. */
+.view.scroll input[type="radio"] { width: 14px; height: 14px; flex: none; }

@@ -91,30 +91,26 @@ block, then to the clipboard with a message. Keep that chain: a silent no-op is 
 
 ## Visual language
 
-Three redesigns taught one lesson: the panel reads as generated when it tries to be **pretty**, and
-reads as real when it tries to be **invisible**. It is a utility someone opens forty times a day.
+Both apps are drawn in **Notion's own visual language**, at Notion's density. The user asked for
+exactly that (v0.9.0) after rejecting two looser passes, a "Notion-inspired" one and a Claude-style
+one with a serif and terracotta, as reading generated. The lesson: imitate Notion's real
+components and measurements, never a mood.
 
-- **No display typography.** Headings are 13px semibold in the same system sans as everything
-  else. A serif heading on warm cream with a terracotta accent is the single most recognisable
-  signature of a generated interface — it was here at v0.6.1 and the user rejected it. Do not
-  reintroduce a serif, a 22px heading, or a "hero" greeting.
-- **13px base, tight rhythm.** Real desktop tools are compact. Space goes between groups, not
-  everywhere uniformly. All five setup steps must fit without scrolling at the default height.
-- **Warm neutrals, kept.** `#faf9f5` / `#262624` grounds; greys are the ink at low alpha so they
-  tint against their surface. This is the one thing carried over from the Claude pass, because a
-  cold grey is harsher than it needs to be beside Notion all day.
-- **Colour carries meaning only.** Terracotta on the send button and links; green and brick for
-  status. Nothing is coloured to look designed. Two accent tokens because one cannot serve both
-  jobs: `--accent` (#b5532f) fills buttons and must carry white text; `--accent-text` (#b5532f
-  light / #e08b6e dark) is for links and must read on the page.
-- **Modest radii** (5px controls, 7px containers, 10px window), one hairline weight, one quiet
-  shadow. Native checkboxes and radios are sized to 14px; the OS default is meant for a full window.
-
-The extension inside notion.so borrows Notion's own surfaces instead (white / `#252525` popovers,
-`rgba(55,53,47,…)` greys, Notion's popover shadow) so it reads as part of the page, and keeps the
-same terracotta accent tokens. It follows Notion's theme from the `dark` class on `<body>`, not the
-OS. Its icon is defined once in `extension/src/shared/mark.ts`; `npm run icons -- --desktop`
-re-renders the extension PNGs and `desktop/build/icon.png` from it.
+- **Notion's tokens.** Ink `#37352f`, secondary ink at 72%, hairlines at 9% / 16%, hover at 6%.
+  Dark is `#191919` / `#202020` / `#252525` with white ink at 86%. Font stack is Notion's
+  (`ui-sans-serif, -apple-system, … "Segoe UI Variable Display"`).
+- **Blue is the one colour.** Notion's `#2383e2` fails 4.5:1 under white text (3.9:1), so fills and
+  link text use `#1c74d4` (4.7:1); switches and focus rings keep `#2383e2`; dark links use Notion's
+  `#529cca`. Terracotta survives only as the dot in the icon.
+- **Notion's components, not lookalikes.** Toggle lists with a solid triangle; status shown as
+  select tags with words ("Done", "Needs you", "Optional"), grey/green/red; switches for settings
+  rows; grey callouts with an emoji; buttons with an inset hairline and 4px corners; menu rows 28–30px.
+- **Sizes.** UI text 14px, meta 12px. Panels (the desktop window, the panel inside notion.so) stay
+  at UI sizes: view headings are Notion's settings-section style, 14px semibold over a hairline.
+  Only the extension's setup page, which is a whole page, uses Notion's page scale: 40px title,
+  24px headings, 16px body, a 708px column. Never a serif.
+- **Icons** are one line set, `extension/src/shared/icons.ts`, used by both apps; the mark is
+  `extension/src/shared/mark.ts`; `npm run icons -- --desktop` re-renders the PNGs from it.
 
 The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, and the
 stylesheet tests require every selector to be declared once — an appended "polish" block that

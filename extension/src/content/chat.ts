@@ -324,13 +324,16 @@ export class ChatWindow {
   private renderWelcome(): void {
     this.messages.replaceChildren();
     const welcome = el("div", "welcome");
+    welcome.append(mark(28), el("p", "ask", "How can I help?"));
     if (!this.status.configured) {
       const card = el("div", "setup-card");
-      card.append(el("p", "", "Oracle needs a Claude or ChatGPT API key before it can answer. Setup takes about a minute."));
-      card.append(textButton("arrowRight", "Open setup", () => void ask({ type: "open-options" }), "btn primary"));
+      const text = el("div");
+      text.append(el("p", "", "Oracle needs a Claude or ChatGPT API key before it can answer. Setup takes about a minute."));
+      text.append(textButton("arrowRight", "Open setup", () => void ask({ type: "open-options" }), "btn primary"));
+      card.append(text);
       welcome.append(card);
     } else {
-      welcome.append(el("p", "", "Ask about this page, or tell me what to write or change. Select text in the page for quick edits."));
+      welcome.append(el("p", "", "Ask about this page or your workspace, or tell me what to write or change. Select text for quick edits."));
     }
     const list = el("div", "suggestions");
     for (const s of SUGGESTIONS) {

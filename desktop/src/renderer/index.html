@@ -7,18 +7,18 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="collapsed">
-  <button id="pill" class="pill" title="Open Oracle">◎</button>
+  <button id="pill" class="pill" title="Open Oracle" aria-label="Open Oracle" data-mark></button>
 
   <div id="panel" class="panel">
     <header class="header">
-      <div class="title"><span class="dot"></span>Oracle</div>
+      <div class="title"><span class="mark" data-mark="18"></span>Oracle</div>
       <span id="brain-label" class="model"></span>
-      <button class="icon-btn" id="btn-new" data-tip="New chat" aria-label="Start a new conversation">+</button>
-      <button class="icon-btn" id="btn-history" data-tip="History" aria-label="Past conversations">☰</button>
-      <button class="icon-btn" id="btn-changes" data-tip="Changes" aria-label="What Oracle changed, and undo">⟲</button>
-      <button class="icon-btn" id="btn-help" data-tip="Help" aria-label="Help and FAQ">?</button>
-      <button class="icon-btn" id="btn-settings" data-tip="Setup" aria-label="Setup and preferences">⚙</button>
-      <button class="icon-btn" id="btn-collapse" data-tip="Close" aria-label="Collapse the panel">✕</button>
+      <button class="icon-btn" id="btn-new" data-tip="New chat" aria-label="Start a new conversation"><span data-icon="plus"></span></button>
+      <button class="icon-btn" id="btn-history" data-tip="History" aria-label="Past conversations"><span data-icon="history"></span></button>
+      <button class="icon-btn" id="btn-changes" data-tip="Changes" aria-label="What Oracle changed, and undo"><span data-icon="undo"></span></button>
+      <button class="icon-btn" id="btn-help" data-tip="Help" aria-label="Help and FAQ"><span data-icon="question"></span></button>
+      <button class="icon-btn" id="btn-settings" data-tip="Setup" aria-label="Setup and preferences"><span data-icon="sliders"></span></button>
+      <button class="icon-btn" id="btn-collapse" data-tip="Close" aria-label="Collapse the panel"><span data-icon="close"></span></button>
     </header>
 
     <!-- ---------- Chat ---------- -->
@@ -32,7 +32,7 @@
       <div class="quick" id="quick"></div>
       <div class="composer">
         <textarea id="input" rows="1" placeholder="What would you like to do?"></textarea>
-        <button id="send" class="send">Send</button>
+        <button id="send" class="send" aria-label="Send"><span data-icon="send"></span></button>
       </div>
       <div class="hint">Enter to send · Shift+Enter for a new line · Esc to collapse</div>
     </section>
@@ -47,10 +47,10 @@
       <!-- Step 1 -->
       <section class="step" id="step-ai">
         <button class="step-head" data-step="ai">
-          <span class="step-badge" id="badge-ai">…</span>
+          <span class="chev"></span>
           <span class="step-title">AI account</span>
           <span class="step-note" id="note-ai">Checking…</span>
-          <span class="chev">›</span>
+          <span class="step-badge" id="badge-ai">Checking</span>
         </button>
         <div class="step-body">
           <p class="muted">Oracle runs on an AI tool you are already signed in to, so it uses your subscription and never an API key.</p>
@@ -82,10 +82,10 @@
       <!-- Step 2 -->
       <section class="step" id="step-notion">
         <button class="step-head" data-step="notion">
-          <span class="step-badge" id="badge-notion">…</span>
+          <span class="chev"></span>
           <span class="step-title">Notion pages</span>
           <span class="step-note" id="note-notion">Checking…</span>
-          <span class="chev">›</span>
+          <span class="step-badge" id="badge-notion">Checking</span>
         </button>
         <div class="step-body">
           <p class="muted">Lets Oracle read and write your Notion pages and databases.</p>
@@ -102,10 +102,10 @@
       <!-- Step 3 -->
       <section class="step" id="step-calendar">
         <button class="step-head" data-step="calendar">
-          <span class="step-badge" id="badge-calendar">…</span>
+          <span class="chev"></span>
           <span class="step-title">Calendar</span>
           <span class="step-note" id="note-calendar">Optional</span>
-          <span class="chev">›</span>
+          <span class="step-badge" id="badge-calendar">Checking</span>
         </button>
         <div class="step-body">
           <p class="muted">On a Mac, add your Google, iCloud or Outlook account in <strong>System Settings → Internet Accounts</strong>; macOS will ask you to approve access the first time. On Windows, Oracle uses <strong>Outlook</strong> — any account added there, including Google and iCloud, works. Either way Oracle can read your real calendar, add to it, and change or move what is there by name, and every change reaches Notion Calendar as the account syncs.</p>
@@ -132,10 +132,10 @@
       <!-- Step 4 -->
       <section class="step" id="step-power">
         <button class="step-head" data-step="power">
-          <span class="step-badge optional" id="badge-power">–</span>
+          <span class="chev"></span>
           <span class="step-title">Deeper search &amp; bulk edits</span>
           <span class="step-note" id="note-power">Off</span>
-          <span class="chev">›</span>
+          <span class="step-badge optional" id="badge-power">Optional</span>
         </button>
         <div class="step-body">
           <p class="muted">Two things Notion AI does that Oracle does not do by default. Both cost more time and more of your AI subscription per question, so they are opt-in.</p>
@@ -149,10 +149,9 @@
       <!-- Step 5 -->
       <section class="step" id="step-prefs">
         <button class="step-head" data-step="prefs">
-          <span class="step-badge ok">✓</span>
+          <span class="chev"></span>
           <span class="step-title">Preferences</span>
           <span class="step-note">Appearance and shortcut</span>
-          <span class="chev">›</span>
         </button>
         <div class="step-body">
           <label id="theme-label">Appearance</label>

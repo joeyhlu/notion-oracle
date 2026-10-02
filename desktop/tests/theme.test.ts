@@ -43,7 +43,7 @@ test("the two dark palettes are identical", () => {
 
 test("dark redefines exactly the tokens light defines", () => {
   // Radii, timing and type stacks are the same in both themes; only colour tokens must be redefined.
-  const themeless = (n: string) => n === "--t" || n.startsWith("--r") || n === "--serif" || n === "--sans";
+  const themeless = (n: string) => n === "--t" || n.startsWith("--r") || n === "--serif" || n === "--sans" || n === "--mono";
   const light = Object.keys(tokens(ruleBody(":root"))).filter((n) => !themeless(n));
   const dark = Object.keys(tokens(ruleBody(':root[data-theme="dark"]')));
   const missing = light.filter((n) => !dark.includes(n));

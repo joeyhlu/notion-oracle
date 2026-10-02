@@ -51,9 +51,12 @@ test("no rule positions every element that has a tooltip", () => {
   assert.doesNotMatch(css, /^\[data-tip\]\s*\{[^}]*position/m);
 });
 
-test("the panel has no display typography", () => {
-  const css = readFileSync(join(import.meta.dirname, "..", "src/content/panel.css"), "utf8") + readFileSync(join(import.meta.dirname, "..", "src/options/options.css"), "utf8");
-  assert.doesNotMatch(css, /(?<!sans-)serif|Georgia|Tiempos|Charter|Times/i);
-  const sizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((m) => Number(m[1]));
-  assert.ok(Math.max(...sizes) <= 16, `largest font size ${Math.max(...sizes)}px`);
+test("no serif anywhere, and no display sizes in the panel inside Notion", () => {
+  const panel = readFileSync(join(import.meta.dirname, "..", "src/content/panel.css"), "utf8");
+  const setup = readFileSync(join(import.meta.dirname, "..", "src/options/options.css"), "utf8");
+  assert.doesNotMatch(panel + setup, /(?<!sans-)serif|Georgia|Tiempos|Charter|Times/i);
+  // The setup page is drawn as a Notion page and carries its 40px title; the panel sits inside
+  // someone's page and must stay at UI sizes.
+  const sizes = [...panel.matchAll(/font-size:\s*(\d+)px/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...sizes) <= 16, `largest panel font size ${Math.max(...sizes)}px`);
 });

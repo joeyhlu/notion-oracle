@@ -1,9 +1,10 @@
 /*
  * Oracle inside Notion.
  *
- * It borrows Notion's own surfaces, greys, radii and popover shadow so it reads as part of the
- * page, and keeps one colour of its own: terracotta, on the send button and links. Every rule is
- * declared once; tests/styles.test.ts refuses a selector repeated in the same context.
+ * It is drawn in Notion's own visual language so it reads as part of the page: Notion's surfaces,
+ * greys, radii, popover shadow and its one colour, blue. #2383e2 is Notion's blue, but white on it
+ * is 3.9:1, so fills and link text use #1c74d4 (4.7:1); dark links use Notion's #529cca. Every
+ * rule is declared once; tests/styles.test.ts refuses a selector repeated in the same context.
  */
 
 :host {
@@ -18,11 +19,11 @@
   --line-2: rgba(55, 53, 47, 0.16);
   --hover: rgba(55, 53, 47, 0.06);
   --active: rgba(55, 53, 47, 0.1);
-  --accent: #b5532f;
+  --accent: #1c74d4;
   --accent-ink: #ffffff;
-  --accent-hover: #a14826;
-  --accent-text: #b5532f;
-  --accent-soft: rgba(181, 83, 47, 0.1);
+  --accent-hover: #1a6fcb;
+  --accent-text: #1c74d4;
+  --accent-soft: rgba(35, 131, 226, 0.14);
   --good: #448361;
   --bad: #c4423d;
   --bad-soft: rgba(212, 76, 71, 0.08);
@@ -51,8 +52,8 @@
   --line-2: rgba(255, 255, 255, 0.14);
   --hover: rgba(255, 255, 255, 0.055);
   --active: rgba(255, 255, 255, 0.09);
-  --accent-text: #e3906f;
-  --accent-soft: rgba(224, 139, 110, 0.14);
+  --accent-text: #529cca;
+  --accent-soft: rgba(35, 131, 226, 0.2);
   --good: #6bb38d;
   --bad: #e9746e;
   --bad-soft: rgba(233, 116, 110, 0.1);
@@ -123,6 +124,8 @@ a:hover { text-decoration: underline; }
 /* empty state */
 .welcome { padding: 20px 16px 8px; }
 .welcome p { margin: 0 0 14px; color: var(--ink-2); }
+.welcome .mark { margin-bottom: 10px; }
+.welcome .ask { color: var(--ink); font-weight: 600; font-size: 16px; margin: 0 0 2px; }
 .suggestions { display: flex; flex-direction: column; gap: 1px; margin: 0 -8px; }
 .suggestion {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 6px 8px; border-radius: var(--r);
@@ -130,7 +133,8 @@ a:hover { text-decoration: underline; }
 }
 .suggestion:hover { background: var(--hover); }
 .suggestion svg { color: var(--ink-2); }
-.setup-card { margin: 4px 0 14px; padding: 12px 14px; border-radius: var(--r-2); background: var(--accent-soft); color: var(--ink); }
+.setup-card { margin: 4px 0 14px; padding: 12px 14px; border-radius: var(--r); background: var(--bg-3); color: var(--ink); display: flex; gap: 10px; }
+.setup-card::before { content: "💡"; font-size: 16px; line-height: 1.4; }
 .setup-card p { margin: 0 0 10px; color: var(--ink); }
 .version { font-size: 12px; color: var(--ink-3); padding: 16px 0 0; }
 
@@ -192,6 +196,7 @@ a:hover { text-decoration: underline; }
 .link:hover { text-decoration: underline; }
 
 .error { color: var(--bad); background: var(--bad-soft); border-radius: var(--r); padding: 8px 10px; font-size: 13px; }
+.error::before { content: "⚠️ "; }
 .error .link { margin-left: 6px; }
 
 /* composer */

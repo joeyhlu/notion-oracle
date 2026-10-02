@@ -9,6 +9,7 @@ import { NotionClient, databaseTitle, pageTitle, type NotionDataSource, type Not
 import { describeAnthropicError } from "../lib/providers/anthropic.ts";
 import { describeOpenAIError } from "../lib/providers/openai.ts";
 import { markSvg } from "../shared/mark.ts";
+import { iconSvg } from "../shared/icons.ts";
 import { loadSettings, saveSettings } from "../shared/settings.ts";
 import { CLAUDE_MODELS, OPENAI_MODELS, type ProviderId, type Settings } from "../shared/types.ts";
 
@@ -88,11 +89,17 @@ function setCheck(id: string, text: string, kind: "ok" | "err" | "wait" | "" = "
   node.className = `check ${kind}`.trim();
 }
 
-function setStep(step: string, done: boolean, badge: string): void {
-  $(`step-${step}`).classList.toggle("done", done);
-  const b = $(`badge-${step}`);
-  b.textContent = badge;
-  b.className = `badge${done ? " ok" : ""}`;
+/**
+ * A step's status, shown twice the way a Notion page would: as a tag beside the heading and in
+ * the property rows at the top. Green when done, red when something is wrong, grey otherwise.
+ */
+function setStep(step: string, kind: "ok" | "bad" | "idle", text: string): void {
+  $(`step-${step}`).classList.toggle("done", kind === "ok");
+  for (const id of [`badge-${step}`, `prop-${step}`]) {
+    const tag = $(id);
+    tag.textContent = text;
+    tag.className = `tag${kind === "idle" ? "" : ` ${kind}`}`;
+  }
 }
 
 let aiCheck = 0;
@@ -103,10 +110,11 @@ async function checkAi(): Promise<void> {
   const key = s.provider === "anthropic" ? s.anthropicApiKey : s.openaiApiKey;
   if (!key) {
     setCheck("check-ai", "");
-    setStep("ai", false, "Needs a key");
+    setStep("ai", "idle", "Needs a key");
     return;
   }
   setCheck("check-ai", "Checking the key…", "wait");
+  setStep("ai", "idle", "Checking");
   try {
     let label: string;
     if (s.provider === "anthropic") {
@@ -118,11 +126,11 @@ async function checkAi(): Promise<void> {
     }
     if (mine !== aiCheck) return;
     setCheck("check-ai", `Connected. Oracle will use ${label}.`, "ok");
-    setStep("ai", true, "Connected");
+    setStep("ai", "ok", "Connected");
   } catch (error) {
     if (mine !== aiCheck) return;
     setCheck("check-ai", s.provider === "anthropic" ? describeAnthropicError(error) : describeOpenAIError(error), "err");
-    setStep("ai", false, "Not working yet");
+    setStep("ai", "bad", "Not working");
   }
 }
 
@@ -135,7 +143,7 @@ async function checkNotion(): Promise<void> {
   list.hidden = true;
   if (!token) {
     setCheck("check-notion", "");
-    setStep("notion", false, "Optional");
+    setStep("notion", "idle", "Not connected");
     return;
   }
   setCheck("check-notion", "Checking…", "wait");
@@ -147,16 +155,18 @@ async function checkNotion(): Promise<void> {
     const name = me.name ?? "your integration";
     if (!found.length) {
       setCheck("check-notion", `Connected as “${name}”, but no pages are shared with it yet. In Notion, open a page, choose ••• → Connections and add ${name}, then press Check again.`, "err");
-      setStep("notion", false, "No pages shared yet");
+      setStep("notion", "bad", "No pages shared");
       return;
     }
     setCheck("check-notion", `Connected as “${name}”. Oracle can see these, and everything under them:`, "ok");
-    setStep("notion", true, "Connected");
+    setStep("notion", "ok", "Connected");
     list.replaceChildren(
       ...found.slice(0, 10).map((r) => {
         const li = document.createElement("li");
+        const name = document.createElement("span");
         const object = (r as { object?: string }).object;
-        li.textContent = object === "data_source" || object === "database" ? databaseTitle(r as NotionDataSource) : pageTitle(r as NotionPage) || "Untitled";
+        name.textContent = object === "data_source" || object === "database" ? databaseTitle(r as NotionDataSource) : pageTitle(r as NotionPage) || "Untitled";
+        li.append(name);
         return li;
       }),
     );
@@ -165,7 +175,7 @@ async function checkNotion(): Promise<void> {
     if (mine !== notionCheck) return;
     const message = error instanceof Error ? error.message : String(error);
     setCheck("check-notion", /401|unauthorized|invalid/i.test(message) ? "Notion did not accept that secret. Copy the Internal Integration Secret again." : message, "err");
-    setStep("notion", false, "Not working yet");
+    setStep("notion", "bad", "Not working");
   }
 }
 
@@ -181,8 +191,9 @@ function debounce(fn: () => void, ms: number): () => void {
 
 async function main(): Promise<void> {
   settings = await loadSettings();
-  $("mark").innerHTML = markSvg(28);
-  for (const node of document.querySelectorAll("[data-version]")) node.textContent = `Version ${chrome.runtime.getManifest().version}`;
+  $("mark").innerHTML = markSvg(78);
+  for (const node of document.querySelectorAll<HTMLElement>("[data-icon]")) node.innerHTML = iconSvg(node.dataset.icon ?? "", 14);
+  for (const node of document.querySelectorAll("[data-version]")) node.textContent = chrome.runtime.getManifest().version;
   for (const node of document.querySelectorAll("[data-mod]")) node.textContent = isMac ? "⌘" : "Ctrl";
 
   const claude = $<HTMLSelectElement>("anthropicModel");
@@ -199,7 +210,6 @@ async function main(): Promise<void> {
   const welcome = new URLSearchParams(location.search).has("welcome");
   const configured = Boolean(settings.provider === "anthropic" ? settings.anthropicApiKey : settings.openaiApiKey);
   if (!welcome && configured) $("lede").textContent = "Settings. Changes save as you make them.";
-  if (configured) $<HTMLDetailsElement>("prefs").open = !welcome;
 
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-provider]")) b.addEventListener("click", () => setProvider(b.dataset.provider as ProviderId));
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-reveal]")) {
