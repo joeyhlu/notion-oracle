@@ -6,65 +6,13 @@
  * it. Each step is the exact inverse of the tool that made the change.
  */
 
-import { NotionClient } from "../../../extension/src/lib/notion.ts";
+import type { NotionClient } from "../../../extension/src/lib/notion.ts";
+import { isNotionUndoStep, undoNotionChange, type UndoResult } from "../../../extension/src/lib/undo.ts";
 import type { Change, UndoStep } from "../shared/journal.ts";
 import type { CalendarEvent, CreateEventInput, UpdateEventInput } from "../mcp/calendar-record.ts";
 
-export interface UndoResult {
-  ok: boolean;
-  message: string;
-}
-
-/** An undo that is a conversion: the replacement goes, the original comes back out of the trash. */
-type WithUnarchive = Extract<UndoStep, { type: "delete-blocks" }> & { thenUnarchive?: string };
-
-export async function undoNotionChange(notion: NotionClient, step: UndoStep): Promise<UndoResult> {
-  switch (step.type) {
-    case "delete-blocks": {
-      const { blockIds, thenUnarchive } = step as WithUnarchive;
-      // Best-effort per block: one already-deleted block should not strand the rest.
-      const failures: string[] = [];
-      for (const id of blockIds) {
-        try {
-          await notion.deleteBlock(id);
-        } catch (error) {
-          failures.push(error instanceof Error ? error.message : String(error));
-        }
-      }
-      if (thenUnarchive) {
-        try {
-          await notion.unarchiveBlock(thenUnarchive);
-        } catch (error) {
-          return { ok: false, message: `Removed the new blocks, but could not restore the original: ${describe(error)}` };
-        }
-      }
-      if (failures.length === blockIds.length && blockIds.length) {
-        return { ok: false, message: `Could not remove the blocks: ${failures[0]}` };
-      }
-      const removed = blockIds.length - failures.length;
-      return { ok: true, message: failures.length ? `Removed ${removed} of ${blockIds.length} blocks; the rest were already gone.` : "Removed." };
-    }
-
-    case "restore-block":
-      await notion.restoreBlock(step.blockId, step.block);
-      return { ok: true, message: "Put the previous text back." };
-
-    case "unarchive-block":
-      await notion.unarchiveBlock(step.blockId);
-      return { ok: true, message: "Restored from Notion's trash." };
-
-    case "archive-page":
-      await notion.archivePage(step.pageId);
-      return { ok: true, message: "Moved to Notion's trash." };
-
-    case "restore-page-properties":
-      await notion.updatePage(step.pageId, step.properties);
-      return { ok: true, message: "Restored the previous values." };
-
-    default:
-      return { ok: false, message: "That change cannot be undone from here." };
-  }
-}
+export { undoNotionChange } from "../../../extension/src/lib/undo.ts";
+export type { UndoResult } from "../../../extension/src/lib/undo.ts";
 
 /**
  * Reverses a calendar change through the same backend the MCP server used: Calendar.app over
@@ -144,6 +92,7 @@ export async function undoChange(change: Change, notion: NotionClient | null): P
   if (!step) return { ok: false, message: "This change was not recorded in a way that can be reversed." };
   if (change.kind === "event") return undoCalendarChange(step);
   if (!notion) return { ok: false, message: "Add your Notion integration secret in setup before undoing Notion changes." };
+  if (!isNotionUndoStep(step)) return { ok: false, message: "That change cannot be undone from here." };
   return undoNotionChange(notion, step);
 }
 

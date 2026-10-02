@@ -1,15 +1,19 @@
 import * as esbuild from "esbuild";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const watch = process.argv.includes("--watch");
 const outdir = "dist";
+// One version for the whole product: package.json is the source, the manifest is generated.
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
-cpSync("src/manifest.json", `${outdir}/manifest.json`);
+const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
+manifest.version = version;
+writeFileSync(`${outdir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
 cpSync("src/options/options.html", `${outdir}/options.html`);
 cpSync("src/options/options.css", `${outdir}/options.css`);
-if (existsSync("icons")) cpSync("icons", `${outdir}/icons`, { recursive: true });
+cpSync("icons", `${outdir}/icons`, { recursive: true });
 
 /** @type {import("esbuild").BuildOptions} */
 const common = {
@@ -34,5 +38,5 @@ if (watch) {
 } else {
   await Promise.all(contexts.map((c) => c.rebuild()));
   await Promise.all(contexts.map((c) => c.dispose()));
-  console.log("Built to dist/. Load it via chrome://extensions → Load unpacked.");
+  console.log(`Built ${version} to dist/. Load it via chrome://extensions → Load unpacked.`);
 }

@@ -11,6 +11,8 @@
  */
 
 
+import type { NotionUndoStep } from "../../../extension/src/lib/undo.ts";
+
 export type ChangeKind = "block" | "page" | "event";
 export type ChangeAction = "create" | "update" | "delete";
 
@@ -35,16 +37,7 @@ export interface Change {
 }
 
 export type UndoStep =
-  /** Blocks Oracle created: remove them again. */
-  | { type: "delete-blocks"; blockIds: string[] }
-  /** A block Oracle rewrote in place: put the old body back. */
-  | { type: "restore-block"; blockId: string; block: Record<string, unknown> }
-  /** A block Oracle archived: Notion keeps it, so it can come back. */
-  | { type: "unarchive-block"; blockId: string }
-  /** A page or database entry Oracle created: send it to the trash. */
-  | { type: "archive-page"; pageId: string }
-  /** Page properties Oracle overwrote: reapply what was there. */
-  | { type: "restore-page-properties"; pageId: string; properties: Record<string, unknown> }
+  | NotionUndoStep
   /** A calendar event Oracle created: delete it. */
   | { type: "delete-event"; uid: string; calendar: string }
   /** A calendar event Oracle changed or removed: write the old fields back. */

@@ -3,99 +3,128 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Notion Oracle settings</title>
+  <title>Oracle setup</title>
+  <link rel="icon" href="icons/icon32.png">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main>
-    <header>
-      <h1><span class="dot"></span> Notion Oracle</h1>
-      <p>Bring your own API key. Keys are stored only in this browser profile (<code>chrome.storage.local</code>) and are sent only to the provider you choose and to Notion.</p>
+    <header class="top">
+      <span id="mark" class="mark"></span>
+      <h1>Oracle</h1>
+      <span class="version" data-version></span>
     </header>
+    <p class="lede" id="lede">Notion AI on your own Claude or ChatGPT key. Three steps, about a minute.</p>
 
-    <section>
-      <h2>1. AI provider</h2>
-      <div class="row">
-        <label class="radio"><input type="radio" name="provider" value="anthropic"> Claude (Anthropic API)</label>
-        <label class="radio"><input type="radio" name="provider" value="openai"> ChatGPT (OpenAI API)</label>
+    <!-- Step 1 -->
+    <section class="step" id="step-ai">
+      <div class="step-head">
+        <span class="num">1</span>
+        <h2>Connect an AI</h2>
+        <span class="badge" id="badge-ai"></span>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="AI provider">
+        <button type="button" role="radio" data-provider="anthropic">Claude</button>
+        <button type="button" role="radio" data-provider="openai">ChatGPT</button>
       </div>
 
-      <fieldset id="anthropic-fields">
-        <label>Anthropic API key
-          <input type="password" id="anthropicApiKey" placeholder="sk-ant-…" autocomplete="off">
-        </label>
-        <small>Create one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. This is separate from a Claude.ai subscription and is billed per use.</small>
-        <label>Model
-          <select id="anthropicModel">
-            <option value="claude-opus-5">Claude Opus 5 (best)</option>
-            <option value="claude-sonnet-5">Claude Sonnet 5 (fast, cheaper)</option>
-            <option value="claude-haiku-4-5">Claude Haiku 4.5 (cheapest)</option>
-          </select>
-        </label>
-        <label>Reasoning effort
-          <select id="effort">
-            <option value="low">Low (fastest)</option>
-            <option value="medium">Medium</option>
-            <option value="high">High (most thorough)</option>
-          </select>
-        </label>
-        <button type="button" class="secondary" data-test="anthropic">Test Claude connection</button>
-      </fieldset>
+      <div id="anthropic-fields" class="fields">
+        <label for="anthropicApiKey">Anthropic API key</label>
+        <div class="key-row">
+          <input type="password" id="anthropicApiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+          <button type="button" class="ghost" data-reveal="anthropicApiKey">Show</button>
+        </div>
+        <p class="help">No key yet? <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Create one at console.anthropic.com</a>, then paste it here. It is pay-as-you-go and separate from a Claude.ai subscription.</p>
+        <div class="row">
+          <label>Model
+            <select id="anthropicModel"></select>
+          </label>
+          <label>Thinking
+            <select id="effort">
+              <option value="low">Quick</option>
+              <option value="medium">Balanced</option>
+              <option value="high">Thorough</option>
+            </select>
+          </label>
+        </div>
+      </div>
 
-      <fieldset id="openai-fields">
-        <label>OpenAI API key
-          <input type="password" id="openaiApiKey" placeholder="sk-…" autocomplete="off">
-        </label>
-        <small>Create one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>. This is separate from a ChatGPT subscription.</small>
-        <label>Model
-          <input type="text" id="openaiModel" list="openai-models" placeholder="gpt-5.5">
-          <datalist id="openai-models">
-            <option value="gpt-5.5"></option>
-            <option value="gpt-5.4"></option>
-            <option value="gpt-5.4-mini"></option>
-            <option value="gpt-5.1"></option>
-            <option value="gpt-5"></option>
-            <option value="gpt-5-mini"></option>
-          </datalist>
-        </label>
-        <button type="button" class="secondary" data-test="openai">Test OpenAI connection</button>
-      </fieldset>
+      <div id="openai-fields" class="fields" hidden>
+        <label for="openaiApiKey">OpenAI API key</label>
+        <div class="key-row">
+          <input type="password" id="openaiApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+          <button type="button" class="ghost" data-reveal="openaiApiKey">Show</button>
+        </div>
+        <p class="help">No key yet? <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Create one at platform.openai.com</a>, then paste it here. It is pay-as-you-go and separate from a ChatGPT subscription.</p>
+        <div class="row">
+          <label>Model
+            <input type="text" id="openaiModel" list="openai-models" spellcheck="false">
+            <datalist id="openai-models"></datalist>
+          </label>
+        </div>
+      </div>
+      <p class="check" id="check-ai" role="status"></p>
     </section>
 
-    <section>
-      <h2>2. Notion integration <span class="badge">optional</span></h2>
-      <p>Without this, Oracle can still read and edit the page you have open. With it, Oracle can search your workspace, create pages, and add entries to databases and calendars.</p>
-      <ol>
-        <li>Open <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so/profile/integrations</a> and create an <strong>internal</strong> integration with read, update and insert content capabilities.</li>
-        <li>Copy its <em>Internal Integration Secret</em> below.</li>
-        <li>In Notion, open each page or database Oracle should reach, click <strong>•••</strong> → <strong>Connections</strong> → add your integration. (Sharing a top-level page shares everything under it.)</li>
+    <!-- Step 2 -->
+    <section class="step" id="step-notion">
+      <div class="step-head">
+        <span class="num">2</span>
+        <h2>Connect Notion</h2>
+        <span class="badge" id="badge-notion"></span>
+      </div>
+      <p class="help">Optional. Without it Oracle works on the page you have open. With it, Oracle can search your workspace, read other pages, create pages, add calendar entries and fill database columns.</p>
+      <ol class="how">
+        <li><a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">Open Notion integrations</a>, choose <b>New integration</b>, name it Oracle, and save.</li>
+        <li>Copy its <b>Internal Integration Secret</b> and paste it below.</li>
+        <li>In Notion, open a top-level page, choose <b>•••</b> → <b>Connections</b>, and add Oracle. Pages under it come along.</li>
       </ol>
-      <label>Internal integration secret
-        <input type="password" id="notionToken" placeholder="ntn_… or secret_…" autocomplete="off">
-      </label>
-      <button type="button" class="secondary" data-test="notion">Test Notion connection</button>
+      <label for="notionToken">Integration secret</label>
+      <div class="key-row">
+        <input type="password" id="notionToken" placeholder="ntn_…" autocomplete="off" spellcheck="false">
+        <button type="button" class="ghost" data-reveal="notionToken">Show</button>
+        <button type="button" class="ghost" id="recheck-notion">Check again</button>
+      </div>
+      <p class="check" id="check-notion" role="status"></p>
+      <ul class="pages" id="notion-pages" hidden></ul>
     </section>
 
-    <section>
-      <h2>3. Custom instructions <span class="badge">optional</span></h2>
-      <label>Always tell Oracle…
-        <textarea id="customInstructions" rows="3" placeholder="e.g. Reply in French. My tasks live in the 'Tasks' database. Keep summaries under 5 bullets."></textarea>
-      </label>
+    <!-- Step 3 -->
+    <section class="step" id="step-try">
+      <div class="step-head">
+        <span class="num">3</span>
+        <h2>Use it in Notion</h2>
+      </div>
+      <dl class="keys">
+        <div><dt>Select text, then <b>Ask AI</b></dt><dd>Improve, shorten, translate, change tone, explain</dd></div>
+        <div><dt><kbd data-mod></kbd> <kbd>J</kbd> in a page</dt><dd>Open the AI menu at your cursor to write or draft</dd></div>
+        <div><dt><kbd data-mod></kbd> <kbd>Shift</kbd> <kbd>Space</kbd></dt><dd>Open the chat: ask about the page or your workspace</dd></div>
+      </dl>
+      <p class="help">Pin Oracle so it is one click away: open the puzzle-piece menu in the browser toolbar and pin <b>Notion Oracle</b>.</p>
+      <div class="actions">
+        <button type="button" class="primary" id="open-notion">Open Notion</button>
+        <button type="button" class="ghost" id="open-shortcuts">Change shortcuts</button>
+      </div>
     </section>
+
+    <details class="prefs" id="prefs">
+      <summary>Preferences</summary>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="webSearch"><span><b>Search the web</b><small>Claude can look things up online when a question needs it.</small></span></label>
+        <label class="toggle"><input type="checkbox" id="workspaceSearch"><span><b>Search inside pages</b><small>Answer questions from what your pages say, not just their titles. Needs Notion connected.</small></span></label>
+        <label class="toggle"><input type="checkbox" id="bulkEdit"><span><b>Fill database columns</b><small>"Summarize every row", "tag these by topic". Needs Notion connected.</small></span></label>
+        <label class="toggle"><input type="checkbox" id="aiShortcut"><span><b><kbd data-mod></kbd> <kbd>J</kbd> opens the AI menu</b><small>Like Notion AI. Turn off to keep Notion's own shortcut.</small></span></label>
+        <label class="toggle"><input type="checkbox" id="selectionButton"><span><b>Ask AI button on selected text</b></span></label>
+        <label class="toggle"><input type="checkbox" id="floatingButton"><span><b>Oracle button in the corner of Notion</b></span></label>
+      </div>
+      <label for="customInstructions">Always tell Oracle</label>
+      <textarea id="customInstructions" rows="3" placeholder="Reply in French. My tasks live in the Tasks database. Keep summaries under five bullets."></textarea>
+    </details>
 
     <footer>
-      <button type="button" id="save" class="primary">Save</button>
-      <span id="status" role="status"></span>
+      <span id="saved" class="saved" role="status"></span>
+      <span class="privacy">Your keys stay in this browser. They are sent only to the AI company you chose and to Notion.</span>
     </footer>
-
-    <section class="help">
-      <h2>Using Oracle</h2>
-      <ul>
-        <li>Open any Notion page and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> (<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> on Mac), click the toolbar icon, or the ◎ button at the bottom right.</li>
-        <li>Try: “Summarize this page”, “Turn the meeting notes into action items”, “Rewrite the selection more formally”, “Add dentist on Sept 12 at 2pm to my calendar”, “Create a page under this one called Q4 plan with an outline”.</li>
-        <li>Change the shortcut at <code>chrome://extensions/shortcuts</code>.</li>
-      </ul>
-    </section>
   </main>
   <script src="options.js"></script>
 </body>

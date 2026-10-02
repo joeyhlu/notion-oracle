@@ -46,7 +46,8 @@ export class OpenAIProvider implements Provider {
     let text = "";
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const stream = await this.client.chat.completions.create(
-        { model: this.opts.model, messages: this.history, tools, stream: true },
+        // An empty tools array is rejected, so a plain completion sends none.
+        { model: this.opts.model, messages: this.history, ...(tools.length ? { tools } : {}), stream: true },
         { signal: ctx.signal },
       );
       let turnText = "";
@@ -111,6 +112,10 @@ export function describeOpenAIError(error: unknown): string {
   if (error instanceof OpenAI.AuthenticationError) return "OpenAI rejected the API key. Check it in Oracle settings.";
   if (error instanceof OpenAI.RateLimitError) return "OpenAI rate limit hit. Wait a moment and try again.";
   if (error instanceof OpenAI.NotFoundError) return "OpenAI model not found. Check the model id in Oracle settings.";
-  if (error instanceof OpenAI.APIError) return `OpenAI API error ${error.status}: ${error.message}`;
+  if (error instanceof OpenAI.APIError) {
+    if (/quota|billing/i.test(error.message)) return "Your OpenAI account has no credit left. Add billing at platform.openai.com, then try again.";
+    return `OpenAI API error ${error.status ?? ""}: ${error.message}`.trim();
+  }
+  if (error instanceof OpenAI.APIConnectionError) return "Could not reach OpenAI. Check your internet connection.";
   return error instanceof Error ? error.message : String(error);
 }

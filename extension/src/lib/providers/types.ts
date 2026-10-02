@@ -25,14 +25,19 @@ export interface TurnEvents {
   onText(delta: string): void;
   onToolStart(id: string, name: string, input: unknown): void;
   onToolEnd(id: string, name: string, ok: boolean, summary: string): void;
+  /** Web pages the answer drew on, when the provider searched the web. */
+  onSources?(sources: Array<{ title: string; url: string }>): void;
 }
 
 export interface TurnContext {
   system: string;
+  /** Empty for a plain completion, such as an AI-menu request. */
   tools: ToolDefinition[];
   execute: ToolExecutor;
   events: TurnEvents;
   signal: AbortSignal;
+  /** Let the model search the web, where the provider supports it. */
+  webSearch?: boolean;
 }
 
 /**

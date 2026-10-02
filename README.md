@@ -15,11 +15,11 @@ Two ways to run it:
 
 | | **Desktop app** (`desktop/`) | **Browser extension** (`extension/`) |
 |---|---|---|
-| Runs | Floating overlay next to the Notion desktop app, Mac / Windows / Linux | Side panel inside notion.so in Chrome |
+| Runs | Floating overlay next to the Notion desktop app, Mac / Windows / Linux | Inside notion.so in Chrome, Edge, Brave or Arc: an AI menu on your selection and at your cursor, plus a chat window |
 | AI account | Your **Claude Pro/Max** sign-in (via Claude Code) or **ChatGPT Plus/Pro** sign-in (via Codex CLI) — no API key | Anthropic or OpenAI **API key** (pay per use) |
 | Notion access | Whole workspace through a Notion integration; edits appear in the app instantly | The open page (DOM), plus the workspace with an integration token |
 | Calendar | Real events: Calendar.app on macOS, Outlook on Windows | Notion databases with a date property |
-| Best for | "Just add AI to my Notion" | Editing text in place on the page you're reading |
+| Best for | "Just add AI to my Notion" | The Notion AI experience in the browser: select text, ask, replace |
 
 ## Desktop app — quick start
 
@@ -78,15 +78,19 @@ New events go to the calendar belonging to your account rather than the empty lo
 
 On Windows any account you have added to Outlook works, Google and iCloud included. On Linux, on a PC without Outlook, or if you'd rather drive Notion Calendar directly, Oracle falls back to opening Notion Calendar and typing the event — create-only, no reading or editing.
 
-## Browser extension — quick start
+## Browser extension — install in a minute
 
-```bash
-cd extension && npm install && npm run build
-```
+1. Download **`notion-oracle-extension-<version>.zip`** from the [Releases](../../releases) page and unzip it. You get one folder, `notion-oracle-extension`.
+2. Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`), switch on **Developer mode**, click **Load unpacked**, and choose that folder.
+3. A setup page opens by itself. Paste a Claude or ChatGPT API key — it turns green when the key works — and optionally a Notion integration secret. There is no Save button; it saves as you type.
 
-Load `extension/dist/` via `chrome://extensions` → Developer mode → Load unpacked, then add an API key in the settings page. See [`extension/README.md`](extension/README.md).
+Then open any Notion page:
 
-Both halves share the same Notion tool layer (`extension/src/lib/`).
+- **Select text → Ask AI**: improve writing, fix spelling and grammar, make shorter or longer, change tone, simplify, translate, explain, summarize, find action items, continue writing. The result previews first; **Replace**, **Insert below**, **Copy**, **Try again**, or tell it what to change.
+- **⌘J / Ctrl+J at the cursor**: continue writing, or draft a blog post, outline, meeting agenda, email, pros and cons, to-do list, brainstorm and more.
+- **⌘⇧Space / Ctrl+Shift+Space**, or the Oracle button in the corner: chat about the page, @-mention other pages, ask questions across your workspace, fill a database column, create pages and calendar entries, and search the web with sources. Chats are saved, and changes made through Notion's API can be undone from the chat's **Changes** list.
+
+See [`extension/README.md`](extension/README.md) for details, what works without a Notion integration, and how to publish it to the Chrome Web Store for true one-click installs.
 
 ## Why a subscription, not an API key?
 

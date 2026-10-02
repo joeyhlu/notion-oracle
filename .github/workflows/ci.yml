@@ -20,6 +20,17 @@ jobs:
           cache-dependency-path: extension/package-lock.json
       - run: npm ci
       - run: npm run check
+
+      # Loads the built extension into Chromium against a mock Notion page and scripted APIs:
+      # setup, the AI menu, chat, web search, mentions, undo, history and both themes.
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/e2e.mjs --out screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-screenshots
+          path: extension/screenshots
+          if-no-files-found: warn
   desktop:
     runs-on: ubuntu-latest
     defaults:

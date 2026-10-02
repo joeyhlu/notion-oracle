@@ -71,3 +71,34 @@ jobs:
           name: Notion Oracle ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: ${{ matrix.artifact }}
+
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/e2e.mjs
+      - run: node scripts/package.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notion-oracle-extension
+          path: extension/release/*.zip
+          if-no-files-found: error
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: Notion Oracle ${{ inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: extension/release/*.zip

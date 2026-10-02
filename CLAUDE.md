@@ -5,10 +5,11 @@ subscription. No API keys, no Notion AI add-on.
 
 ## Layout
 
-- `desktop/` — the Electron app. This is the product.
-- `extension/` — a Chrome MV3 side panel, API-key based. Shares the Notion tool layer with the
-  desktop app: `extension/src/lib/` is imported by `desktop/src/mcp/notion-server.ts`, so a change
-  there affects both. Run both test suites.
+- `desktop/` — the Electron app, on the user's Claude or ChatGPT subscription.
+- `extension/` — a Chrome MV3 extension on an API key: Notion AI's selection menu, ⌘J at the
+  cursor, and a chat window, all inside notion.so. `extension/src/lib/` is shared: the desktop
+  imports its Notion client, tools, Markdown and undo, so a change there affects both. Run both
+  test suites.
 
 ## How it works
 
@@ -37,7 +38,9 @@ cd desktop
 npm run check    # typecheck + build + 213 tests
 npm run smoke    # renders the built panel in Chromium, both themes  (needs a browser, see below)
 npm start        # run from source
-cd ../extension && npm run check   # 41 tests
+cd ../extension && npm run check   # typecheck + 75 tests + build
+npm run e2e                        # loads dist/ into Chromium against a mock Notion: every feature
+npm run package                    # zip for the release page / Chrome Web Store
 ```
 
 `npm test` runs against `dist/`, not `src/`. **Rebuild before testing a source change** or you are
@@ -70,6 +73,19 @@ Windows installer.
 
 **`normalizeId` rejects anything that is not a Notion UUID.** Test fixtures need real-shaped ids.
 
+**Playwright's default headless browser cannot load extensions.** `scripts/e2e.mjs` launches
+with `channel: "chromium"` (or `CHROMIUM_PATH`); the headless shell silently runs without the
+extension and every check fails on a missing host element.
+
+**A shadow-DOM rule can outrank positioning.** `[data-tip] { position: relative }` once beat
+`.fab { position: fixed }` (same specificity, later rule) and put the floating button half off the
+left edge. Tooltip anchors are positioned by their own rules; `tests/styles.test.ts` and the e2e
+position check guard it.
+
+**Notion's editor is not ours to drive.** The extension writes by dispatching a synthetic paste
+and checks the page changed afterwards; Insert below then falls back to the API after the right
+block, then to the clipboard with a message. Keep that chain: a silent no-op is the failure mode.
+
 **Electron's transparent frameless window** breaks Playwright screenshots of the collapsed pill
 (compositing never settles). Assert computed styles instead; it is a harness quirk, not a bug.
 
@@ -94,6 +110,12 @@ reads as real when it tries to be **invisible**. It is a utility someone opens f
 - **Modest radii** (5px controls, 7px containers, 10px window), one hairline weight, one quiet
   shadow. Native checkboxes and radios are sized to 14px; the OS default is meant for a full window.
 
+The extension inside notion.so borrows Notion's own surfaces instead (white / `#252525` popovers,
+`rgba(55,53,47,…)` greys, Notion's popover shadow) so it reads as part of the page, and keeps the
+same terracotta accent tokens. It follows Notion's theme from the `dark` class on `<body>`, not the
+OS. Its icon is defined once in `extension/src/shared/mark.ts`; `npm run icons -- --desktop`
+re-renders the extension PNGs and `desktop/build/icon.png` from it.
+
 The render check asserts 4.5:1 on the panel, pill, send button and chips in both themes, and the
 stylesheet tests require every selector to be declared once — an appended "polish" block that
 re-declares rules is how two earlier regressions hid, and the test exists to refuse it.
@@ -107,9 +129,13 @@ else — set it on the repo before committing and verify with
 
 The version shown in the app is injected by `scripts/build.mjs` from `package.json` via esbuild
 `define` (`__APP_VERSION__`), and the main process uses `app.getVersion()`. Never hard-code it —
-`tests/version.test.ts` fails if the number appears as a literal in the renderer.
+`tests/version.test.ts` fails if the number appears as a literal in the renderer. The extension's
+`src/manifest.json` carries `0.0.0`; its build writes the version from `extension/package.json`.
+Both packages move together: one release, one number.
 
-Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with a `tag` input.
+Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with a `tag` input. A
+release has five assets: two DMGs, the Windows `.exe`, the AppImage and
+`notion-oracle-extension-<version>.zip`.
 Pushing a tag directly returns 403 from the session token. Always confirm the release's **asset
 list** afterwards rather than the run's exit status: a job can pass while an installer is missing.
 
@@ -141,5 +167,10 @@ to change or clear a rule, and the Outlook recurrence pattern in `win-calendar.t
 Two undo paths are pinned by request shape but unconfirmed against the live API: `unarchiveBlock`
 (`PATCH {archived:false}`) and `restore-page-properties`. A failure in either is visible and
 recoverable — the journal entry stays un-undone with the error shown.
+
+The extension is verified end to end only against a mock Notion page and scripted APIs. Not yet
+confirmed on the live notion.so: that Notion's editor accepts the synthetic paste (the fallbacks
+cover it if not), that the capture-phase ⌘J listener runs before Notion's own, and the exact
+selectors (`.notion-page-content`, `data-block-id`, `body.dark`) on the current Notion build.
 
 Do not describe any of these as working.

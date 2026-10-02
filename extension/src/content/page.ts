@@ -73,6 +73,45 @@ export function readPage(): PageSnapshot {
 
 // ---------- Selection tracking ----------
 
+/** The selection inside the editor right now, if it covers any text. */
+export function editorSelection(): { range: Range; text: string } | null {
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  if (!isInsideEditor(range.startContainer)) return null;
+  const text = sel.toString();
+  return text.trim() ? { range: range.cloneRange(), text } : null;
+}
+
+/** The caret inside the editor, collapsed or not. */
+export function editorCaret(): Range | null {
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  return isInsideEditor(range.startContainer) ? range.cloneRange() : null;
+}
+
+/** Where to anchor a popup for a range. A collapsed caret often has no rect of its own. */
+export function rangeRect(range: Range): DOMRect {
+  const rects = range.getClientRects();
+  const last = rects[rects.length - 1];
+  if (last && (last.width || last.height)) return range.collapsed ? last : range.getBoundingClientRect();
+  const host = (range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement)?.closest<HTMLElement>("[data-block-id], [contenteditable]");
+  return host?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 3, 0, 0);
+}
+
+/** The Notion block a node sits in: the innermost element carrying a block id. */
+export function blockFor(node: Node | null): HTMLElement | null {
+  const el = node instanceof Element ? node : node?.parentElement ?? null;
+  return el?.closest<HTMLElement>("[data-block-id]") ?? null;
+}
+
+/** Notion's block ids in the DOM are the API's ids, dashed or not. */
+export function blockIdOf(block: HTMLElement | null): string | null {
+  const raw = block?.getAttribute("data-block-id")?.replace(/-/g, "") ?? "";
+  return /^[0-9a-f]{32}$/i.test(raw) ? raw : null;
+}
+
 let lastRange: Range | null = null;
 
 function isInsideEditor(node: Node | null): boolean {
@@ -153,6 +192,59 @@ export function insertText(text: string, position: "cursor" | "end"): string {
   if (!target) throw new Error("Could not find an editable block on this page. Is a page open in edit mode?");
   typeInto(target, prefix + text);
   return `Inserted ${text.length} characters ${position === "cursor" && !prefix ? "at the cursor" : "at the end of the page"}.`;
+}
+
+function blockCount(): number {
+  return document.querySelectorAll(`${CONTENT_SELECTOR} [data-block-id]`).length;
+}
+
+/** Waits for Notion to re-render after a paste. */
+const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 250));
+
+/**
+ * Puts text in a new block below the one `range` ends in, the way "Insert below" works in Notion
+ * AI. An empty block (the line the user pressed the AI shortcut on) is written into instead.
+ * Resolves true when the page visibly changed, so the caller can fall back to the API.
+ */
+export async function insertBelow(range: Range, text: string): Promise<boolean> {
+  const block = blockFor(range.endContainer);
+  const editables = block ? Array.from(block.querySelectorAll<HTMLElement>('[contenteditable="true"]')) : [];
+  const editable = editables[editables.length - 1] ?? editableFor(range.endContainer);
+  if (!editable || !document.contains(editable)) return false;
+  const before = blockCount();
+  const beforeText = editable.innerText;
+  const empty = !editable.innerText.trim();
+  editable.focus();
+  const caret = document.createRange();
+  caret.selectNodeContents(editable);
+  caret.collapse(false);
+  const sel = document.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(caret);
+  typeInto(editable, empty ? text : `\n${text}`);
+  await settle();
+  return blockCount() > before || editable.innerText !== beforeText;
+}
+
+/** The first words of what was written, with Markdown markers stripped, to look for afterwards. */
+function fingerprint(markdown: string): string {
+  const line = markdown.split("\n").map((l) => l.replace(/^\s*(#{1,3}\s|[-*]\s(\[[ x]\]\s)?|\d+\.\s|>\s)?/, "").replace(/[*_`]/g, "").trim()).find(Boolean) ?? "";
+  return line.slice(0, 24);
+}
+
+/**
+ * Replaces the text a saved range covers. Resolves true only when the replacement can be seen
+ * in the page, so a delete that happened without the paste is reported as a failure.
+ */
+export async function replaceRange(range: Range, text: string): Promise<boolean> {
+  const editable = restoreRange(range);
+  if (!editable) return false;
+  const root = (editable.closest(CONTENT_SELECTOR) as HTMLElement | null) ?? editable;
+  document.execCommand("delete");
+  typeInto(editable, text);
+  await settle();
+  const probe = fingerprint(text);
+  return !probe || root.innerText.includes(probe);
 }
 
 export function replaceSelection(text: string): string {
