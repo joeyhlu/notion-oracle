@@ -4,7 +4,7 @@ A floating AI panel that sits next to the Notion desktop app. It runs on your ow
 
 ## Install
 
-**From a release:** grab the `.dmg` (Mac) or `.exe` (Windows) from the [Releases](../../../releases) page.
+**From a release:** the [Download table in the main README](../README.md#download) has a link per platform that always points at the newest release.
 
 - **Mac:** builds are ad-hoc signed but not notarized, so the first launch needs approval: right-click → **Open**, or **System Settings → Privacy & Security → Open Anyway**. If macOS calls the app damaged, run `xattr -cr "/Applications/Notion Oracle.app"` then `codesign --force --deep --sign - "/Applications/Notion Oracle.app"`. See [INSTALL.md](../INSTALL.md).
 - **Windows:** SmartScreen shows "unknown publisher" the first time; click **More info → Run anyway**.
@@ -23,10 +23,10 @@ npm run dist     # build an installer for this OS into release/
 The app opens the setup screen on first launch.
 
 1. **AI account.** Pick Claude or ChatGPT. Oracle looks for the `claude` / `codex` command, shows its version and whether you're signed in, and offers:
-   - **Install…** — opens the vendor's install page and shows the one-line install commands.
+   - **Install Claude Code / Codex CLI** — opens your terminal running the vendor's one-line installer.
    - **Sign in** — opens your terminal running `claude auth login` or `codex login`. That uses your existing subscription.
-   - **Re-check** — after installing or signing in.
-2. **Notion.** Create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations) (read, update, insert content), paste its secret, and share your top-level pages with it (**••• → Connections**). **Test Notion** tells you how many pages it can see.
+   - After either, Oracle keeps checking for a few minutes and the badge turns green on its own; **Re-check** is there too.
+2. **Notion.** Create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations) (read, update, insert content), paste its secret, and share your top-level pages with it (**••• → Connections**). The secret is checked, and kept, as soon as it is pasted; the message says how many pages it can see.
 3. **Save & start.**
 
 ## Use

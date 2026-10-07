@@ -25,16 +25,18 @@ Go to the [latest release](../../releases/latest) and scroll to **Assets** near 
 
 | You have | Download |
 |---|---|
-| Mac, Apple chip | `Notion.Oracle-<version>-arm64.dmg` |
-| Mac, Intel chip | `Notion.Oracle-<version>.dmg` |
-| Windows | `Notion.Oracle.Setup.<version>.exe` |
-| Linux | `Notion.Oracle-<version>.AppImage` |
+| Mac, Apple chip | [`Notion-Oracle-mac-arm64.dmg`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-arm64.dmg) |
+| Mac, Intel chip | [`Notion-Oracle-mac-x64.dmg`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-x64.dmg) |
+| Windows | [`Notion-Oracle-win-x64.exe`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-win-x64.exe) |
+| Linux | [`Notion-Oracle-linux-x64.AppImage`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x64.AppImage) |
+
+The links always point at the newest release, and [joeyhlu.github.io/notion-oracle](https://joeyhlu.github.io/notion-oracle/) picks the right one for the computer you open it on.
 
 ### Install
 
 - **Mac:** double-click the `.dmg`. A window opens with the app icon next to an Applications folder — drag the icon onto the folder.
 - **Windows:** double-click the `.exe` and click through the installer.
-- **Linux:** `chmod +x Notion.Oracle-*.AppImage`, then run it.
+- **Linux:** `chmod +x Notion-Oracle-linux-x64.AppImage`, then run it.
 
 ### The first launch will look blocked. It isn't broken.
 
@@ -69,7 +71,7 @@ The app opens straight into a setup screen with three numbered sections.
 
 Claude is preselected. The app looks for Claude Code on your machine and reports what it finds.
 
-**If it shows a red ✗ "not found",** click **Install…** and run the command it shows you in a terminal:
+**If it shows a red ✗ "not found",** click **Install Claude Code**. A terminal opens and runs the installer; leave it until it finishes. Oracle keeps checking in the background and the badge turns green by itself. If you would rather run it yourself, the command is:
 
 - **Mac:** press ⌘+Space, type `Terminal`, Enter. Then:
   ```bash
@@ -80,7 +82,7 @@ Claude is preselected. The app looks for Claude Code on your machine and reports
   irm https://claude.ai/install.ps1 | iex
   ```
 
-Then click **Sign in** in the app. A terminal opens running `claude auth login` and your browser asks you to log in — this connects your Claude Pro/Max subscription. Come back and click **Re-check**.
+Then click **Sign in** in the app. A terminal opens running `claude auth login` and your browser asks you to log in — this connects your Claude Pro/Max subscription. Come back to Oracle; it notices the sign-in on its own (**Re-check** is there if you are impatient).
 
 > **Do not continue until you see a green ✓ and the words "Signed in."**
 
@@ -90,11 +92,11 @@ Prefer ChatGPT? Select it instead; it needs the [Codex CLI](https://developers.o
 
 1. Open [notion.so/profile/integrations](https://www.notion.so/profile/integrations) (the app links to it).
 2. Create a **new integration**, name it `Oracle`, type **Internal**, with **read**, **update** and **insert content** capabilities.
-3. Copy the **Internal Integration Secret** (starts with `ntn_`) and paste it into the app.
+3. Copy the **Internal Integration Secret** (starts with `ntn_`) and paste it into the app. It is checked the moment you paste it, and kept if it works.
 4. **Share your pages — the step everyone forgets.** In Notion go to **Settings → Connections**, find Oracle, and tick your top-level pages. Everything nested underneath is included automatically.
-5. Back in the app, click **Test Notion**.
+5. Back in the app, click **Test connection** to see the count go up.
 
-> **If Test Notion reports zero pages, stop and fix step 4.** Nothing else will work until it can see something.
+> **If the check says it cannot see any pages yet, stop and fix step 4.** Nothing else will work until it can see something.
 
 ### 3. Preferences (optional)
 
@@ -112,17 +114,17 @@ Then "what's on my calendar this week?", "add dentist Sept 12 at 2pm" and "move 
 
 Open any Notion page, then press **⌘⇧Space** (Mac) or **Ctrl⇧Space** (Windows).
 
-Run these in order. Each builds on the last, so the first one that fails tells you exactly what is broken.
+The empty chat lists these five, in this order. Click them one at a time. Each builds on the last, so the first one that fails tells you exactly what is broken.
 
 | # | Ask | Proves |
 |---|---|---|
 | 1 | "What page am I looking at?" | Hotkey, window detection, AI sign-in and Notion search all work |
-| 2 | "Summarize this page in three bullets." | It can read page content, not just titles |
-| 3 | "Search my workspace for *something you know exists*." | Your sharing covers what you expect |
-| 4 | "Add a bullet list of three fruits to the end of the Oracle Test page." | Writing back to Notion |
-| 5 | "Add 'Test event' to my Calendar on Friday." | Database/calendar entries, the fiddliest path |
+| 2 | "Summarize this page in three bullets" | It can read page content, not just titles |
+| 3 | "What's on my calendar this week?" | Calendar access and its permission prompt |
+| 4 | "Create a page under this one called Oracle Test, with a short outline" | Writing to Notion, on a page that costs nothing |
+| 5 | "Add a to-do list of three things to the end of Oracle Test" | Editing an existing page in place |
 
-**Make a throwaway page called `Oracle Test` before test 4** so a mistake costs nothing.
+Every change shows up in the **⟲ Changes** list with an Undo, so nothing in this list is permanent.
 
 ---
 

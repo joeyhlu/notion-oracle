@@ -13,6 +13,12 @@ const { join } = require("node:path");
 
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== "darwin") return;
+  // A real certificate is in play (electron-builder.signed.yml): electron-builder signs and
+  // notarizes, and an ad-hoc pass here would overwrite that signature with a worthless one.
+  if (process.env.CSC_LINK) {
+    console.log("  • leaving code signing to electron-builder  reason=CSC_LINK is set");
+    return;
+  }
 
   const appName = `${context.packager.appInfo.productFilename}.app`;
   const appPath = join(context.appOutDir, appName);

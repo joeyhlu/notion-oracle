@@ -141,11 +141,23 @@ The version shown in the app is injected by `scripts/build.mjs` from `package.js
 `src/manifest.json` carries `0.0.0`; its build writes the version from `extension/package.json`.
 Both packages move together: one release, one number.
 
-Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with a `tag` input. A
-release has five assets: two DMGs, the Windows `.exe`, the AppImage and
-`notion-oracle-extension-<version>.zip`.
+Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with a `tag` input; an
+empty tag is a dry run that builds all three platforms and uploads workflow artifacts only. A
+release has five assets, named without the version so that
+`releases/latest/download/<name>` is a link that never changes: `Notion-Oracle-mac-arm64.dmg`,
+`Notion-Oracle-mac-x64.dmg`, `Notion-Oracle-win-x64.exe`, `Notion-Oracle-linux-x64.AppImage` and
+`notion-oracle-extension.zip`. The README's download table, INSTALL.md and `docs/index.html`
+(the GitHub Pages site, deployed by `pages.yml` from `main`) all use those links; renaming an
+asset breaks every one of them.
 Pushing a tag directly returns 403 from the session token. Always confirm the release's **asset
 list** afterwards rather than the run's exit status: a job can pass while an installer is missing.
+
+Setup is meant to need no reading: Install and Sign in both open a terminal running the vendor's
+command, then the renderer polls `checkBrain` every four seconds for up to five minutes (one in
+flight at a time, only while setup is on screen, started only by those two buttons so the render
+check never polls); the Notion secret is tested 600ms after a paste that looks like one and
+saved the moment it works. The empty chat's five suggestions are INSTALL.md's walkthrough, in
+its order, and they write only to a page Oracle creates.
 
 Every mutating Notion or calendar tool must record a reversible entry to the change journal, with
 enough before-state to undo it. Capture that state before the write — Notion keeps no version to
@@ -199,6 +211,16 @@ checked in Chromium, and its bundled MCP server run under the packaged binary as
 itself has not been launched from that package: a second ad-hoc-signed build on a Mac that already
 runs Oracle triggers fresh Automation prompts. The Windows and Linux packages on Electron 44 come
 only from the release workflow and have not been run by hand.
+
+**The signed build has never run with a certificate.** `desktop/electron-builder.signed.yml`
+extends the ad-hoc config with Developer ID, hardened runtime and notarization; `release.yml`
+selects it only when the `MAC_CERT_P12_BASE64` secret exists (with `MAC_CERT_PASSWORD`,
+`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`), and `WIN_CERT_P12_BASE64` +
+`WIN_CERT_PASSWORD` turn on Authenticode for the installer. Without the secrets the ad-hoc path
+is unchanged. The config parses and the identity lookup fails cleanly without a certificate; that
+is all that has been checked. The first signed release needs a person with the certificate to
+watch the run, confirm `spctl --assess` passes on the DMG, and that the entitlements in
+`build/entitlements.mac.plist` survive notarization.
 
 The extension is verified end to end only against a mock Notion page and scripted APIs. Not yet
 confirmed on the live notion.so: that Notion's editor accepts the synthetic paste (the fallbacks

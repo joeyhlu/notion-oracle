@@ -1,5 +1,5 @@
 /**
- * Zips dist/ into release/notion-oracle-extension-<version>.zip: the file people download from
+ * Zips dist/ into release/notion-oracle-extension.zip: the file people download from
  * the release page and load, and the file a Chrome Web Store upload takes. No dependencies: the
  * zip format is written by hand with deflate from node:zlib.
  *
@@ -86,6 +86,7 @@ end.writeUInt32LE(centralSize, 12);
 end.writeUInt32LE(offset, 16);
 
 mkdirSync("release", { recursive: true });
-const out = `release/notion-oracle-extension-${version}.zip`;
+// No version in the name: the release page's latest/download link must stay valid across releases.
+const out = "release/notion-oracle-extension.zip";
 writeFileSync(out, Buffer.concat([...locals, ...centrals, end]));
 console.log(`Wrote ${out} (${files.length} files)`);

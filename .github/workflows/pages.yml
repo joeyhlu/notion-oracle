@@ -1,0 +1,34 @@
+# Publishes docs/ as the project site: a download page whose links always point at the newest
+# release, so it never needs to change when one ships. GitHub Pages must be set to deploy from
+# a workflow (Settings → Pages → Source: GitHub Actions) for this to take effect.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: [docs/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

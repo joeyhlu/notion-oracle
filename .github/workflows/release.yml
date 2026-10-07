@@ -40,11 +40,40 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
-      - run: npx electron-builder --publish never
 
-      # Proves the macOS build carries a valid (ad-hoc) signature. An app with a broken or
-      # missing signature is what makes macOS report "the app is damaged", so this must fail
-      # the build rather than ship a DMG nobody can open.
+      # Signed when the repository has the certificates, ad-hoc when it does not. Add these
+      # repository secrets to switch the macOS build to Developer ID + notarization:
+      #   MAC_CERT_P12_BASE64, MAC_CERT_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+      # and these for Authenticode on the Windows installer:
+      #   WIN_CERT_P12_BASE64, WIN_CERT_PASSWORD
+      # Nothing else changes; an empty secret leaves the unsigned path exactly as it was.
+      - name: Build installers
+        shell: bash
+        env:
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WIN_CERT_P12_BASE64: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.os }}" = "macos-latest" ] && [ -n "$MAC_CERT_P12_BASE64" ]; then
+            echo "Signing with Developer ID and notarizing"
+            CSC_LINK="$MAC_CERT_P12_BASE64" CSC_KEY_PASSWORD="$MAC_CERT_PASSWORD" \
+              npx electron-builder --config electron-builder.signed.yml --publish never
+          elif [ "${{ matrix.os }}" = "windows-latest" ] && [ -n "$WIN_CERT_P12_BASE64" ]; then
+            echo "Signing the Windows installer"
+            CSC_LINK="$WIN_CERT_P12_BASE64" CSC_KEY_PASSWORD="$WIN_CERT_PASSWORD" \
+              npx electron-builder --publish never
+          else
+            npx electron-builder --publish never
+          fi
+
+      # Proves the macOS build carries a valid signature, ad-hoc or Developer ID. An app with a
+      # broken or missing signature is what makes macOS report "the app is damaged", so this must
+      # fail the build rather than ship a DMG nobody can open.
       - name: Verify macOS code signature
         if: matrix.os == 'macos-latest'
         run: |

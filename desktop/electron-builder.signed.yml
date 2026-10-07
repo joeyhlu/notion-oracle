@@ -1,0 +1,17 @@
+# The Developer ID build: everything in electron-builder.yml, signed with a real certificate and
+# notarized by Apple, so the first launch is a double-click rather than a trip through
+# Privacy & Security. The release workflow picks this file only when the signing secrets exist;
+# without them the ad-hoc build in electron-builder.yml ships exactly as before.
+#
+# Needs, in the environment (see .github/workflows/release.yml for the secret names):
+#   CSC_LINK                      base64 of the Developer ID Application .p12
+#   CSC_KEY_PASSWORD              its password
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID   for notarization
+#
+# Not yet run against a real certificate: see CLAUDE.md, "Not verified against real hardware".
+extends: ./electron-builder.yml
+mac:
+  identity: Developer ID Application
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  notarize: true

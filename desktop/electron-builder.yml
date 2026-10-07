@@ -1,5 +1,8 @@
 appId: com.notionoracle.desktop
 productName: Notion Oracle
+# No version in the file name, so https://github.com/joeyhlu/notion-oracle/releases/latest/download/<name>
+# is a link that never needs editing. The version is in the app's header, tray and Help screen.
+artifactName: Notion-Oracle-${os}-${arch}.${ext}
 directories:
   output: release
   buildResources: build

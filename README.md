@@ -11,6 +11,20 @@ Ask it things in plain language and it does them in Notion for real — no copy-
 > *"Put 'Dentist' on my calendar Thursday at 2."*
 > *"What's on my calendar this week?"*
 
+## Download
+
+Every link below always points at the newest release. **[notion-oracle on GitHub Pages](https://joeyhlu.github.io/notion-oracle/)** picks the right one for your machine.
+
+| | Download | Then |
+|---|---|---|
+| **Mac, Apple silicon** (M1 and later) | [Notion-Oracle-mac-arm64.dmg](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-arm64.dmg) | Open the DMG, drag the app to Applications. First launch: right-click → **Open** (see [INSTALL.md](INSTALL.md)) |
+| **Mac, Intel** | [Notion-Oracle-mac-x64.dmg](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-x64.dmg) | Same |
+| **Windows** | [Notion-Oracle-win-x64.exe](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-win-x64.exe) | Run it. At "Windows protected your PC": **More info → Run anyway** |
+| **Linux** | [Notion-Oracle-linux-x64.AppImage](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x64.AppImage) | `chmod +x`, then run |
+| **Browser extension** (Chrome, Edge, Brave, Arc) | [notion-oracle-extension.zip](https://github.com/joeyhlu/notion-oracle/releases/latest/download/notion-oracle-extension.zip) | Unzip, then `chrome://extensions` → Developer mode → **Load unpacked** |
+
+Not sure which Mac you have? Apple menu → **About This Mac**: "Apple M1/M2/M3/M4" means Apple silicon.
+
 Two ways to run it:
 
 | | **Desktop app** (`desktop/`) | **Browser extension** (`extension/`) |
@@ -25,16 +39,14 @@ Two ways to run it:
 
 > **New to this?** [`INSTALL.md`](INSTALL.md) is a click-by-click walkthrough of the steps below, including the unsigned-app warning and a set of test prompts to run in order. The app also has a **Help** screen (the **?** in its header) answering the things that most often go wrong.
 
-1. **Download** the installer for your OS from the [Releases](../../releases) page — `-arm64.dmg` for Apple Silicon Macs, `.dmg` for Intel Macs, `.exe` for Windows. Or build it yourself: `cd desktop && npm install && npm run dist`.
-2. **Install the AI tool you already pay for**, if you haven't:
-   - Claude: [Claude Code](https://code.claude.com/docs/en/quickstart) — `curl -fsSL https://claude.ai/install.sh | bash` (Mac) or `irm https://claude.ai/install.ps1 | iex` (Windows PowerShell).
+1. **Download** the installer for your machine from the table above, or build it yourself: `cd desktop && npm install && npm run dist`.
+2. **Install the AI tool you already pay for**, if you haven't. Oracle's setup screen has an **Install** button that opens a terminal running the installer, and a **Sign in** button that runs the login (`claude auth login` or `codex login`); it notices on its own when each finishes. Or do it by hand:
+   - Claude: [Claude Code](https://code.claude.com/docs/en/quickstart) — `curl -fsSL https://claude.ai/install.sh | bash` (Mac, Linux) or `irm https://claude.ai/install.ps1 | iex` (Windows PowerShell).
    - ChatGPT: [Codex CLI](https://developers.openai.com/codex/cli) — `npm install -g @openai/codex`.
-
-   Oracle detects the tool, shows whether you're signed in, and its **Sign in** button opens a terminal running the login (`claude auth login` or `codex login`) for you.
-3. **Connect Notion:** create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations), paste its secret into Oracle, and **share your pages with it** (**••• → Connections** in Notion). Sharing a top-level page shares everything underneath it. *This is the step people miss* — without it Oracle can authenticate but sees an empty workspace.
+3. **Connect Notion:** create an internal integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations), paste its secret into Oracle (it is checked the moment you paste it), and **share your pages with it** (**••• → Connections** in Notion). Sharing a top-level page shares everything underneath it. *This is the step people miss* — without it Oracle can authenticate but sees an empty workspace, and the setup screen tells you so.
 4. **Optional — connect your calendar**: on a Mac, add your Google, iCloud or Outlook account in **System Settings → Internet Accounts**; on Windows, Oracle uses Outlook, so any account added there works. Then turn on the calendar step in Oracle's setup. The OS asks you to approve access the first time.
 5. **Optional — turn on deeper search or bulk edits** in setup, if you want Oracle to search inside your pages or fill a database column. See below for what each costs.
-6. Press **⌘⇧Space** (**Ctrl⇧Space** on Windows) or click the ◎ pill to talk to Oracle.
+6. Press **⌘⇧Space** (**Ctrl⇧Space** on Windows) or click the ◎ pill to talk to Oracle. The first chat offers five suggestions in order, from the simplest check to a real edit; each one proves a different part of the setup.
 
 Setup is four steps with live status badges — green when done, red when it's blocking, dash when optional — so you can see at a glance what's left.
 
@@ -80,7 +92,7 @@ On Windows any account you have added to Outlook works, Google and iCloud includ
 
 ## Browser extension — install in a minute
 
-1. Download **`notion-oracle-extension-<version>.zip`** from the [Releases](../../releases) page and unzip it. You get one folder, `notion-oracle-extension`.
+1. Download **[notion-oracle-extension.zip](https://github.com/joeyhlu/notion-oracle/releases/latest/download/notion-oracle-extension.zip)** and unzip it. You get one folder, `notion-oracle-extension`.
 2. Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`), switch on **Developer mode**, click **Load unpacked**, and choose that folder.
 3. A setup page opens by itself. Paste a Claude or ChatGPT API key — it turns green when the key works — and optionally a Notion integration secret. There is no Save button; it saves as you type.
 
