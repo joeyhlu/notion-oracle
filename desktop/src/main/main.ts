@@ -16,6 +16,7 @@ import { getNotionWindow } from "./notion-window.ts";
 import { getNotionSelection } from "./selection.ts";
 import { buildSystemPrompt, buildUserTurn } from "./prompt.ts";
 import { SettingsStore } from "./settings.ts";
+import { FileLog } from "./log.ts";
 import { openTerminal } from "./terminal.ts";
 import { pruneChanges, readChanges, rewriteChanges } from "../shared/journal-file.ts";
 import type { Change } from "../shared/journal.ts";
@@ -30,6 +31,13 @@ const MARGIN = 16;
 if (process.env.NOTION_ORACLE_USER_DATA) app.setPath("userData", process.env.NOTION_ORACLE_USER_DATA);
 
 const settings = new SettingsStore(app.getPath("userData"));
+const log = new FileLog(join(app.getPath("userData"), "logs", "oracle.log"));
+
+// A tray app that dies quietly is indistinguishable from one that was never started. Write the
+// failure down and stay up: the tray and window keep working, and the next turn starts fresh.
+process.on("uncaughtException", (error) => log.error("Uncaught exception", error));
+process.on("unhandledRejection", (reason) => log.error("Unhandled rejection", reason));
+
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let mode: OverlayMode = "collapsed";
@@ -160,6 +168,7 @@ function createTray(): void {
       { label: "Start at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
       { label: `Shortcut: ${settings.get().hotkey.replace("CommandOrControl", process.platform === "darwin" ? "⌘" : "Ctrl")}`, enabled: false },
       { type: "separator" },
+      { label: "Show log file", click: () => shell.showItemInFolder(log.path) },
       { label: "Quit Notion Oracle", click: () => app.quit() },
     ]);
     tray?.setContextMenu(menu);
@@ -184,6 +193,12 @@ function registerHotkey(): void {
 }
 
 async function openExternal(url: string): Promise<void> {
+  // Only web and Notion links leave the app. The text that links come from is written by the
+  // model, so a file:, javascript: or custom-scheme URL is refused rather than handed to the OS.
+  if (!/^(https?|notion):/i.test(url)) {
+    log.warn("Refused to open a link", url);
+    return;
+  }
   // Send Notion links to the desktop app instead of the browser.
   const target = /^https:\/\/(www\.)?notion\.so\//.test(url) ? url.replace(/^https:\/\//, "notion://") : url;
   await shell.openExternal(target);
@@ -313,6 +328,8 @@ async function runChat(request: ChatRequest): Promise<void> {
       onEvent: withChanges,
     });
   } catch (error) {
+    // "Stopped." is the user pressing Stop, not a failure.
+    if (!(controller.signal.aborted && error instanceof Error && error.message === "Stopped.")) log.error("Turn failed", error);
     send({ type: "error", message: error instanceof Error ? error.message : String(error), threadId: request.threadId });
   } finally {
     if (activeRun === controller) activeRun = null;
@@ -349,6 +366,7 @@ function registerIpc(): void {
       const results = await client.search("", undefined, 5);
       return { ok: true, message: results.length ? `Connected as "${me.name ?? "integration"}"; it can see ${results.length}${results.length === 5 ? "+" : ""} pages.` : `Connected as "${me.name ?? "integration"}", but it cannot see any pages yet. Share pages with it in Notion (••• → Connections).` };
     } catch (error) {
+      log.warn("Notion connection test failed", error instanceof Error ? error.message : String(error));
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -376,8 +394,10 @@ function registerIpc(): void {
       const result = await undoChange(change, token ? new NotionClient(token) : null);
       // Marked only on success, so a failed undo stays available to retry.
       if (result.ok) rewriteChanges(journalPath(), (c) => (c.id === id ? { ...c, undone: true } : c));
+      else log.warn(`Undo of "${change.label}" refused`, result.message);
       return result;
     } catch (error) {
+      log.error(`Undo of "${change.label}" failed`, error);
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
@@ -391,6 +411,7 @@ if (!gotLock) {
 } else {
   app.on("second-instance", () => setMode("expanded"));
   app.whenReady().then(() => {
+    log.info(`Notion Oracle ${app.getVersion()} started`, { platform: process.platform, arch: process.arch, electron: process.versions.electron });
     if (process.platform === "darwin") app.dock?.hide();
     registerIpc();
     createWindow();
@@ -401,6 +422,8 @@ if (!gotLock) {
   // Keep running in the tray when the overlay window is closed.
   app.on("window-all-closed", () => undefined);
   app.on("will-quit", () => {
+    // Otherwise the CLI and the tool servers it spawned outlive the app.
+    activeRun?.abort();
     globalShortcut.unregisterAll();
     watcher?.stop();
   });

@@ -17,7 +17,8 @@ const notion = token ? new NotionClient(token) : null;
 
 export const server = new StdioMcpServer({
   name: "notion-oracle",
-  version: "0.1.0",
+  // The app version, injected by the build; "dev" when the source is run directly, as the tests do.
+  version: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev",
   instructions: notion
     ? "Tools for reading and writing the user's Notion workspace. Call get_database before creating or updating database entries, and read_page_blocks before editing existing content."
     : "No Notion token is configured; every tool will fail until the user adds one in Notion Oracle settings.",

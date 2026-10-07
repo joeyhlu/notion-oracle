@@ -9,6 +9,41 @@ export const NOTION_API_VERSION = "2025-09-03";
 const BASE_URL = "https://api.notion.com/v1";
 const MAX_CHILDREN_PER_REQUEST = 100;
 
+/** Attempts per request, counting the first. */
+export const MAX_ATTEMPTS = 3;
+const DEFAULT_TIMEOUT_MS = 30_000;
+/** Answers that mean "not now" rather than "no": the limiter, and a gateway that could not reach Notion. */
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+export interface NotionClientOptions {
+  /** Stands in for the global fetch; tests pass a scripted one. */
+  fetch?: typeof fetch;
+  /** How long one request may take before it is abandoned. */
+  timeoutMs?: number;
+  /** The wait between attempts; tests make it instant and record what was asked for. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * How long to wait before trying again.
+ *
+ * Notion sends Retry-After in seconds on a 429, and that is the number to respect: the limiter
+ * counts the retry too, so guessing shorter only earns another 429. Without the header, 500ms
+ * doubling per attempt is enough for a gateway blip and short enough that a search reading pages
+ * five at a time does not stall.
+ */
+export function retryDelayMs(attempt: number, retryAfter: string | null | undefined): number {
+  const seconds = retryAfter == null ? NaN : Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds, 30) * 1000;
+  return Math.min(500 * 2 ** attempt, 8_000);
+}
+
+function describeTransportError(error: unknown, timeoutMs: number): string {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError" || name === "AbortError") return `Notion did not answer within ${Math.round(timeoutMs / 1000)} seconds. Try again in a moment.`;
+  return `Could not reach Notion: ${error instanceof Error ? error.message : String(error)}. Check the internet connection.`;
+}
+
 export class NotionApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
@@ -160,13 +195,29 @@ interface Paginated<T> {
 
 export class NotionClient {
   private readonly token: string;
+  private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
 
-  constructor(token: string) {
+  constructor(token: string, options: NotionClientOptions = {}) {
     this.token = token;
+    // Resolved at call time so a test that swaps the global fetch is honoured too.
+    this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
+  /**
+   * One API call, with a timeout and a bounded retry.
+   *
+   * A 429 or a 502/503 is tried again after a wait, whatever the method: the limiter answers
+   * before doing anything, and those gateway errors mean the request never reached Notion. A
+   * 504, a timeout or a dropped connection is retried only for a GET. The request may have been
+   * carried out before the answer was lost, and retrying a create would make the page twice.
+   */
   async request<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const url = `${BASE_URL}${path}`;
+    const init: RequestInit = {
       method,
       headers: {
         Authorization: `Bearer ${this.token}`,
@@ -174,19 +225,36 @@ export class NotionClient {
         "Content-Type": "application/json",
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await res.text();
-    let json: unknown = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = null;
+    };
+    for (let attempt = 0; ; attempt++) {
+      const canRetry = attempt < MAX_ATTEMPTS - 1;
+      let res: Response;
+      try {
+        res = await this.fetchImpl(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
+      } catch (error) {
+        if (canRetry && method === "GET") {
+          await this.sleep(retryDelayMs(attempt, null));
+          continue;
+        }
+        throw new Error(describeTransportError(error, this.timeoutMs));
+      }
+      const text = await res.text();
+      if (RETRYABLE_STATUSES.has(res.status) && canRetry && (method === "GET" || res.status !== 504)) {
+        await this.sleep(retryDelayMs(attempt, res.headers.get("retry-after")));
+        continue;
+      }
+      let json: unknown = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+      if (!res.ok) {
+        const err = json as { message?: string; code?: string } | null;
+        throw new NotionApiError(err?.message ?? `Notion API ${res.status}`, res.status, err?.code);
+      }
+      return json as T;
     }
-    if (!res.ok) {
-      const err = json as { message?: string; code?: string } | null;
-      throw new NotionApiError(err?.message ?? `Notion API ${res.status}`, res.status, err?.code);
-    }
-    return json as T;
   }
 
   me(): Promise<{ name?: string; type: string }> {

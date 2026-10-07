@@ -500,7 +500,8 @@ export const execute: ToolExecutor = async (name, input) => {
 
 export const server = new StdioMcpServer({
   name: "notion-oracle-calendar",
-  version: "0.1.0",
+  // The app version, injected by the build; "dev" when the source is run directly, as the tests do.
+  version: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev",
   instructions: SYSTEM_CALENDAR
     ? `Tools for the user's real calendar (their Google, iCloud or Outlook account) through ${BACKEND_NAME}, which syncs to the account and shows up in ${APP_NAME}. Reading, creating, updating and deleting all work. If a tool reports a permission or setup problem, relay its instructions to the user instead of retrying.`
     : `Tools that control the ${APP_NAME} desktop app by keystrokes, which is the only option on this platform. The app must be open. Creating an event cannot be read back, so ask the user to confirm the result.`,
