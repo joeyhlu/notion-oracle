@@ -5,13 +5,13 @@
  */
 
 import type { ToolDefinition, ToolExecutor } from "../../../extension/src/lib/providers/types.ts";
-import { APP_NAME, activateCalendarApp, calendarAppStatus, createCalendarEvent, openCalendarDate, parseWhen, type Strategy } from "./calendar-app.ts";
+import { APP_NAME, activateCalendarApp, createCalendarEvent, openCalendarDate, parseWhen, probes, type Strategy } from "./calendar-app.ts";
 import * as mac from "./mac-calendar.ts";
 import * as win from "./win-calendar.ts";
 import { CALENDAR_TOOL_NAMES } from "./calendar-tools.ts";
 import { StdioMcpServer } from "./stdio-server.ts";
 import { appendChange } from "../shared/journal-file.ts";
-import { dayOf, parseIso, type CalendarEvent } from "./calendar-record.ts";
+import { dayOf, localIso, parseIso, type CalendarEvent } from "./calendar-record.ts";
 import { chooseTarget, dayWindow, defaultWindow, describeWhen, planTimes, rankMatches, SEARCH_DAYS_AHEAD, SEARCH_DAYS_BACK } from "./calendar-edit.ts";
 import { describeRRule, toRRule } from "./rrule.ts";
 
@@ -255,7 +255,7 @@ async function setDefault(name: string): Promise<string> {
 }
 
 async function status(): Promise<Record<string, unknown>> {
-  const app = await calendarAppStatus();
+  const app = await probes.calendarAppStatus();
   const base = { notion_calendar_app: app, default_backend: SYSTEM_CALENDAR ? "system-calendar" : "notion-app-keystrokes" };
   if (!SYSTEM_CALENDAR) {
     const reason = process.platform === "darwin" || process.platform === "win32"
@@ -334,7 +334,7 @@ async function locate(input: Record<string, unknown>): Promise<CalendarEvent> {
   const choice = chooseTarget(rankMatches(events, match), match, on ? { on } : {});
   if (choice.kind === "one") return choice.event;
   if (choice.kind === "none") {
-    const where = on ? `on ${dayOf(on)}` : `between ${dayOf(window.from.toISOString())} and ${dayOf(window.to.toISOString())}`;
+    const where = on ? `on ${dayOf(on)}` : `between ${dayOf(localIso(window.from))} and ${dayOf(localIso(window.to))}`;
     throw new Error(`No event matching "${match}" ${where}${calendar ? ` in "${calendar}"` : ""}. Try other words from the title, or calendar_find_events with a wider from/to.`);
   }
   const list = choice.candidates.map((c) => `- "${c.title}" — ${describeWhen(c)} (${c.calendar}), uid ${c.uid}`).join("\n");
@@ -384,7 +384,7 @@ export const execute: ToolExecutor = async (name, input) => {
         const to = str(input.to) ? parseIso(str(input.to), "to") : window.to;
         const events = await backend.listEvents(from.toISOString(), to.toISOString(), str(input.calendar) || undefined);
         const matches = rankMatches(events, query);
-        const range = `${dayOf(from.toISOString())} to ${dayOf(to.toISOString())}`;
+        const range = `${dayOf(localIso(from))} to ${dayOf(localIso(to))}`;
         if (!matches.length) return ok({ matches: [], searched: range, note: "Nothing with that in the title. Try other words, or pass from/to to look further out." });
         return ok({ matches: matches.slice(0, 25).map(present), searched: range });
       }

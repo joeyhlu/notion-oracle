@@ -189,6 +189,13 @@ export async function calendarAppStatus(): Promise<CalendarAppStatus> {
   return { running: false, platform: process.platform, method: "unsupported", detail: `Controlling ${APP_NAME} is only supported on macOS and Windows.` };
 }
 
+/**
+ * The probe behind calendar_status and the keystroke fallback, on an object so a test can put a
+ * fixed answer in its place. The real one asks the OS whether Notion Calendar is running, which
+ * made two tests pass or fail depending on what the developer happened to have open.
+ */
+export const probes = { calendarAppStatus };
+
 // ---------- plan execution ----------
 
 const ACCESSIBILITY_HELP = `macOS blocked the keystrokes: Notion Oracle needs Accessibility permission. Tell the user to open System Settings → Privacy & Security → Accessibility, enable Notion Oracle, then try again.`;
@@ -288,7 +295,7 @@ export async function createCalendarEvent(input: CreateEventInput, options: Plan
   // Validate the request before touching the app, so a bad date is reported as a bad date
   // rather than being hidden behind "the app is not running".
   const plan = buildCreateEventPlan(input, options);
-  const status = await calendarAppStatus();
+  const status = await probes.calendarAppStatus();
   if (!status.running) throw new Error(status.detail);
   await executePlan(plan);
   return {

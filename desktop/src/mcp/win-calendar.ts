@@ -14,7 +14,7 @@
  * tools above the two are identical.
  */
 
-import { records, parseCalendars, parseEvents, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
+import { localIso, records, parseCalendars, parseEvents, type CalendarEvent, type CalendarInfo, type CreateEventInput, type UpdateEventInput } from "./calendar-record.ts";
 import { runCapture } from "../main/process.ts";
 import { parseRRule, WEEKDAYS, type Rule } from "./rrule.ts";
 
@@ -160,7 +160,9 @@ export function recurrenceStatements(recurrence: string): string[] {
     lines.push(`$rp.DayOfWeekMask = ${mask}`);
   }
   if (rule.count) lines.push(`$rp.Occurrences = ${rule.count}`);
-  else if (rule.until) lines.push(`$rp.PatternEndDate = [datetime]::Parse(${psLiteral(rule.until.toISOString().slice(0, 10))})`);
+  // Local calendar date, not toISOString(): UNTIL is parsed as local 23:59:59, which west of UTC
+  // is already the next day in UTC, so the ISO slice ended every series a day late.
+  else if (rule.until) lines.push(`$rp.PatternEndDate = [datetime]::Parse(${psLiteral(localIso(rule.until).slice(0, 10))})`);
   else lines.push("$rp.NoEndDate = $true");
   return lines;
 }

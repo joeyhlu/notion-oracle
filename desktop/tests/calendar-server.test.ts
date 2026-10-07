@@ -6,6 +6,22 @@ import { StdioMcpServer } from "../src/mcp/stdio-server.ts";
 // runs after the assignment below rather than a static (hoisted) one.
 process.env.NOTION_ORACLE_MCP_TEST = "1";
 const { server, CALENDAR_TOOLS, execute } = await import("../src/mcp/calendar-server.ts");
+const { probes } = await import("../src/mcp/calendar-app.ts");
+
+// The control method differs by platform: macOS and Windows probe for the app, Linux reports the
+// platform as unsupported.
+const EXPECTED_METHOD = process.platform === "darwin" ? "applescript" : process.platform === "win32" ? "powershell" : "unsupported";
+const APP_UNREACHABLE = /is not running|only supported on macOS and Windows/;
+
+// The real probe asks the OS whether Notion Calendar is running, so these tests used to pass on
+// CI (where it never is) and fail on a developer's Mac with the app open. Stand in the answer the
+// real probe gives when the app is not running, worded as it words it.
+probes.calendarAppStatus = async () => ({
+  running: false,
+  platform: process.platform,
+  method: EXPECTED_METHOD,
+  detail: EXPECTED_METHOD === "unsupported" ? "Controlling Notion Calendar is only supported on macOS and Windows." : "Notion Calendar is not running. Ask the user to open it; it must be open for calendar changes.",
+});
 
 // Sanity check on the module's default export: it's a real server, just not the one we drive in
 // these tests (it defaults to writing on stdout, which we don't want mixed into `node --test` output).
@@ -59,12 +75,6 @@ test("initialize and tools/list expose this platform's calendar tools, each with
     "every tool must carry an inputSchema",
   );
 });
-
-// CI runs these on all three platforms. Notion Calendar is installed on none of them, so the
-// app is never running, but the control method differs: macOS and Windows really probe for the
-// app, Linux reports the platform as unsupported.
-const EXPECTED_METHOD = process.platform === "darwin" ? "applescript" : process.platform === "win32" ? "powershell" : "unsupported";
-const APP_UNREACHABLE = /is not running|only supported on macOS and Windows/;
 
 test("calendar_status reports both backends and how each is set up", async () => {
   const { srv, lines } = makeServer();
