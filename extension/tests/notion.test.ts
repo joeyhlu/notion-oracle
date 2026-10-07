@@ -119,3 +119,10 @@ test("a 4xx that is not the limiter is not retried", async () => {
   await assert.rejects(() => notion.getPage(PAGE_ID), (error: unknown) => error instanceof NotionApiError && error.status === 404);
   assert.equal(calls.length, 1);
 });
+
+test("a search is a POST that only reads, so a dropped connection is retried for it", async () => {
+  const hits = () => new Response(JSON.stringify({ results: [], has_more: false, next_cursor: null }), { status: 200 });
+  const { notion, calls } = client([() => new TypeError("fetch failed"), hits]);
+  assert.deepEqual(await notion.search("budget"), []);
+  assert.deepEqual(calls.map((c) => c.method), ["POST", "POST"]);
+});

@@ -288,7 +288,7 @@ body.collapsed .panel { display: none; }
 .chip:active { background: var(--active); }
 /* The suggestions: a menu of rows, as Notion AI lists them, shown only on the empty chat. */
 .quick { display: flex; flex-direction: column; padding: 0 8px 8px; }
-.quick::before { content: "Suggested"; font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 0 8px 4px; }
+.quick::before { content: "Try these, in order"; font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 0 8px 4px; }
 .suggestion {
   display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 8px;
   border: none; background: none; border-radius: var(--r-2); text-align: left; color: var(--ink);
@@ -441,6 +441,10 @@ body.collapsed .panel { display: none; }
 .status-line.ok { color: var(--good); }
 .status-line.bad { color: var(--bad); }
 .status-actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+/* The result of checking the Notion secret, in the colour of a Notion status tag. */
+.notion-status { font-size: 12px; color: var(--ink-2); flex: 1 1 100%; }
+.notion-status.ok { color: var(--good); }
+.notion-status.bad { color: var(--bad); }
 .advanced { margin-top: 12px; font-size: 13px; }
 .advanced summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
 .advanced summary:hover { color: var(--ink); }

@@ -45,7 +45,7 @@ function installBridge(ready) {
       detail: ready ? "signed in" : "not found on this machine",
     }),
     getPageHint: async () => window.__hint ?? null,
-    testNotion: async () => ({ ok: true, message: "Connected" }),
+    testNotion: async () => ({ ok: true, message: "Connected", pages: 3 }),
     chatSend: async (req) => { window.__lastRun = req.runId; },
     chatAbort: async () => {},
     getChanges: async () => window.__changes ?? [],
@@ -59,7 +59,7 @@ function installBridge(ready) {
     deleteConversation: async (id) => {
       window.__conversations = (window.__conversations ?? []).filter((c) => c.id !== id);
     },
-    setMode: () => {}, openExternal: () => {}, openSignIn: () => {}, quit: () => {},
+    setMode: () => {}, openExternal: () => {}, openSignIn: () => {}, openInstall: () => {}, quit: () => {},
     onChatEvent: (cb) => { window.__emit = cb; },
     onMode: () => {},
   };

@@ -213,9 +213,12 @@ export class NotionClient {
    * A 429 or a 502/503 is tried again after a wait, whatever the method: the limiter answers
    * before doing anything, and those gateway errors mean the request never reached Notion. A
    * 504, a timeout or a dropped connection is retried only for a GET. The request may have been
-   * carried out before the answer was lost, and retrying a create would make the page twice.
+   * carried out before the answer was lost, and retrying a create would make the page twice. A
+   * POST that only reads (search, query) passes `idempotent` and is treated like a GET.
    */
-  async request<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
+  async request<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown, options: { idempotent?: boolean } = {}): Promise<T> {
+    // Search and query are POSTs that only read, so a lost answer costs nothing to ask again.
+    const safeToRepeat = method === "GET" || options.idempotent === true;
     const url = `${BASE_URL}${path}`;
     const init: RequestInit = {
       method,
@@ -232,14 +235,14 @@ export class NotionClient {
       try {
         res = await this.fetchImpl(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
       } catch (error) {
-        if (canRetry && method === "GET") {
+        if (canRetry && safeToRepeat) {
           await this.sleep(retryDelayMs(attempt, null));
           continue;
         }
         throw new Error(describeTransportError(error, this.timeoutMs));
       }
       const text = await res.text();
-      if (RETRYABLE_STATUSES.has(res.status) && canRetry && (method === "GET" || res.status !== 504)) {
+      if (RETRYABLE_STATUSES.has(res.status) && canRetry && (safeToRepeat || res.status !== 504)) {
         await this.sleep(retryDelayMs(attempt, res.headers.get("retry-after")));
         continue;
       }
@@ -265,7 +268,7 @@ export class NotionClient {
   async search(query: string, objectType?: "page" | "database" | "data_source", pageSize = 10): Promise<Array<NotionPage | NotionDataSource>> {
     const body: Record<string, unknown> = { query, page_size: pageSize, sort: { direction: "descending", timestamp: "last_edited_time" } };
     if (objectType) body.filter = { property: "object", value: objectType === "page" ? "page" : "data_source" };
-    const res = await this.request<Paginated<NotionPage | NotionDataSource>>("POST", "/search", body);
+    const res = await this.request<Paginated<NotionPage | NotionDataSource>>("POST", "/search", body, { idempotent: true });
     return res.results;
   }
 
@@ -325,7 +328,7 @@ export class NotionClient {
   }
 
   async queryDataSource(dataSourceId: string, body: Record<string, unknown>): Promise<NotionPage[]> {
-    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, body);
+    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, body, { idempotent: true });
     return res.results;
   }
 
@@ -525,7 +528,7 @@ export class NotionClient {
   /** Rows of a database with their page text, for filling a property across a table. */
   async readDatabaseRows(dataSourceId: string, options: { limit?: number; includeContent?: boolean; onlyEmpty?: string } = {}): Promise<DatabaseRow[]> {
     const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
-    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, { page_size: limit });
+    const res = await this.request<Paginated<NotionPage>>("POST", `/data_sources/${normalizeId(dataSourceId)}/query`, { page_size: limit }, { idempotent: true });
     const rows: DatabaseRow[] = [];
     for (const page of res.results) {
       if (options.onlyEmpty && !isEmptyProperty(page.properties?.[options.onlyEmpty])) continue;

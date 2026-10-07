@@ -151,14 +151,27 @@ export const INSTALL_COMMANDS: Record<BrainId, { mac: string; win: string; npm: 
 
 export const SIGN_IN_COMMANDS: Record<BrainId, string> = { claude: "claude auth login", codex: "codex login" };
 
+/**
+ * The one-line installer for this machine. The vendors' shell installers cover macOS and Linux;
+ * Codex's "mac" line is Homebrew, which Linux does not have, so it falls back to npm there.
+ */
+export function installCommand(brain: BrainId, platform: NodeJS.Platform): string {
+  const commands = INSTALL_COMMANDS[brain];
+  if (platform === "win32") return commands.win;
+  if (platform === "darwin") return commands.mac;
+  return brain === "claude" ? commands.mac : commands.npm;
+}
+
 /** API exposed to the renderer by the preload script. */
 export interface OracleApi {
   getSettings(): Promise<Settings>;
   saveSettings(patch: Partial<Settings>): Promise<Settings>;
   checkBrain(brain: BrainId, pathOverride?: string): Promise<BrainStatus>;
   openSignIn(brain: BrainId): Promise<void>;
+  /** Opens a terminal running the vendor's installer, the same way openSignIn runs the login. */
+  openInstall(brain: BrainId): Promise<void>;
   openExternal(url: string): Promise<void>;
-  testNotion(token: string): Promise<{ ok: boolean; message: string }>;
+  testNotion(token: string): Promise<{ ok: boolean; message: string; pages?: number }>;
   getPageHint(): Promise<PageHint>;
   platform(): Promise<NodeJS.Platform>;
   chatSend(request: ChatRequest): Promise<void>;

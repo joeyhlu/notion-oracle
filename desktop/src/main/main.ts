@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { NotionClient } from "../../../extension/src/lib/notion.ts";
 import { notionTools } from "../../../extension/src/lib/tools.ts";
 import { CALENDAR_TOOL_NAMES } from "../mcp/calendar-tools.ts";
-import { DEFAULT_SETTINGS, type BrainId, type ChatEvent, type ChatRequest, type OverlayMode, type Settings } from "../shared/types.ts";
+import { DEFAULT_SETTINGS, installCommand, type BrainId, type ChatEvent, type ChatRequest, type OverlayMode, type Settings } from "../shared/types.ts";
 import { ClaudeBrain } from "./brains/claude.ts";
 import { CodexBrain } from "./brains/codex.ts";
 import type { Brain, McpServerSpec } from "./brains/types.ts";
@@ -35,7 +35,12 @@ const log = new FileLog(join(app.getPath("userData"), "logs", "oracle.log"));
 
 // A tray app that dies quietly is indistinguishable from one that was never started. Write the
 // failure down and stay up: the tray and window keep working, and the next turn starts fresh.
-process.on("uncaughtException", (error) => log.error("Uncaught exception", error));
+process.on("uncaughtException", (error) => {
+  log.error("Uncaught exception", error);
+  // Before the tray exists there is nothing to see and no way to quit; an invisible process that
+  // never finished starting is worse than none. After ready, the tray and window carry on.
+  if (!app.isReady()) app.exit(1);
+});
 process.on("unhandledRejection", (reason) => log.error("Unhandled rejection", reason));
 
 let win: BrowserWindow | null = null;
@@ -358,13 +363,14 @@ function registerIpc(): void {
       openTerminal(`${path ? JSON.stringify(path) : brain} ${command}`);
     });
   });
+  ipcMain.handle("oracle:open-install", (_e, brain: BrainId) => openTerminal(installCommand(brain, process.platform)));
   ipcMain.handle("oracle:open-external", (_e, url: string) => openExternal(url));
   ipcMain.handle("oracle:test-notion", async (_e, token: string) => {
     try {
       const client = new NotionClient(token.trim());
       const me = await client.me();
       const results = await client.search("", undefined, 5);
-      return { ok: true, message: results.length ? `Connected as "${me.name ?? "integration"}"; it can see ${results.length}${results.length === 5 ? "+" : ""} pages.` : `Connected as "${me.name ?? "integration"}", but it cannot see any pages yet. Share pages with it in Notion (••• → Connections).` };
+      return { ok: true, pages: results.length, message: results.length ? `Connected as "${me.name ?? "integration"}"; it can see ${results.length}${results.length === 5 ? "+" : ""} pages.` : `Connected as "${me.name ?? "integration"}", but it cannot see any pages yet. Share pages with it in Notion (••• → Connections).` };
     } catch (error) {
       log.warn("Notion connection test failed", error instanceof Error ? error.message : String(error));
       return { ok: false, message: error instanceof Error ? error.message : String(error) };

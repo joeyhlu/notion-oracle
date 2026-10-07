@@ -6,6 +6,7 @@ const api: OracleApi = {
   saveSettings: (patch: Partial<Settings>) => ipcRenderer.invoke("oracle:save-settings", patch),
   checkBrain: (brain: BrainId, pathOverride?: string) => ipcRenderer.invoke("oracle:check-brain", brain, pathOverride),
   openSignIn: (brain: BrainId) => ipcRenderer.invoke("oracle:open-sign-in", brain),
+  openInstall: (brain: BrainId) => ipcRenderer.invoke("oracle:open-install", brain),
   openExternal: (url: string) => ipcRenderer.invoke("oracle:open-external", url),
   testNotion: (token: string) => ipcRenderer.invoke("oracle:test-notion", token),
   getPageHint: () => ipcRenderer.invoke("oracle:page-hint"),

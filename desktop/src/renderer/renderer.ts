@@ -4,7 +4,7 @@ import { markdownToHtml } from "../../../extension/src/lib/markdown.ts";
 import { describeTool, isWriteTool } from "../../../extension/src/lib/activity.ts";
 import { iconSvg } from "../../../extension/src/shared/icons.ts";
 import { markSvg } from "../../../extension/src/shared/mark.ts";
-import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, type BrainId, type Change, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
+import { BRAIN_LABELS, INSTALL_COMMANDS, INSTALL_DOCS, asTheme, installCommand, type BrainId, type Change, type ChatEvent, type Settings, type Theme } from "../shared/types.ts";
 import { summarise } from "../shared/journal.ts";
 import { titleFrom, type Conversation } from "../shared/conversations.ts";
 
@@ -20,12 +20,17 @@ function shortLabel(brain: BrainId): string {
 /** Baked in by the build from package.json, so it cannot drift from what was released. */
 const VERSION = __APP_VERSION__;
 
+/**
+ * The walkthrough, as INSTALL.md lays it out: cheapest failure first. Each one proves a different
+ * part of the setup, so the first that fails says what is wrong. The writes go to a page Oracle
+ * creates, never to whatever the user happened to have open.
+ */
 const QUICK_ACTIONS: Array<[icon: string, text: string]> = [
-  ["summarize", "Summarize the page I'm looking at"],
+  ["status", "What page am I looking at?"],
+  ["summarize", "Summarize this page in three bullets"],
   ["list", "What\u2019s on my calendar this week?"],
-  ["edit", "Move my dentist appointment to Friday at 3"],
-  ["todo", "Turn this page into a to-do list and add it to the end"],
-  ["page", "Create a page under this one with an outline for…"],
+  ["page", "Create a page under this one called Oracle Test, with a short outline"],
+  ["todo", "Add a to-do list of three things to the end of Oracle Test"],
 ];
 
 let settings: Settings;
@@ -137,7 +142,7 @@ function renderEmpty(): void {
   messages().replaceChildren();
   showSuggestions(true);
   const empty = el("div", "empty");
-  empty.innerHTML = `<span class="mark">${markSvg(28)}</span><strong>How can I help?</strong>Ask about the page you have open in Notion, draft something, or change your calendar. What I change shows up in Notion right away.`;
+  empty.innerHTML = `<span class="mark">${markSvg(28)}</span><strong>How can I help?</strong>Ask about the page you have open in Notion, draft something, or change your calendar. What I change shows up in Notion right away. New here? The suggestions below run from the simplest check to a real edit; try them in order.`;
   messages().appendChild(empty);
 }
 
@@ -331,7 +336,8 @@ async function loadSetupForm(): Promise<void> {
   await checkBrain();
 }
 
-async function checkBrain(): Promise<void> {
+/** Reports the AI tool's state in the status card and says whether it is ready to use. */
+async function checkBrain(): Promise<boolean> {
   const brain = selectedBrain();
   const line = $("brain-status").querySelector<HTMLElement>(".status-line")!;
   line.className = "status-line";
@@ -342,11 +348,79 @@ async function checkBrain(): Promise<void> {
   line.classList.add(ok ? "ok" : "bad");
   $("status-icon").textContent = ok ? "✓" : "✗";
   $("status-text").textContent = status.installed ? `${BRAIN_LABELS[brain]}: ${status.version ?? "installed"} · ${status.detail}` : status.detail;
-  $<HTMLButtonElement>("btn-signin").hidden = !status.installed;
+  const tool = brain === "claude" ? "Claude Code" : "Codex CLI";
+  $<HTMLButtonElement>("btn-install").hidden = status.installed;
+  $<HTMLButtonElement>("btn-install").textContent = `Install ${tool}`;
+  $<HTMLButtonElement>("btn-signin").hidden = !status.installed || ok;
   $("install-help").hidden = status.installed;
-  const cmds = INSTALL_COMMANDS[brain];
-  $("install-cmd-native").textContent = platform === "win32" ? cmds.win : cmds.mac;
-  $("install-cmd-npm").textContent = cmds.npm;
+  $("install-cmd-native").textContent = installCommand(brain, platform);
+  $("install-cmd-npm").textContent = INSTALL_COMMANDS[brain].npm;
+  return ok;
+}
+
+/**
+ * Install and Sign in both hand the user to a terminal. Rather than asking them to come back and
+ * press Re-check, keep checking while setup is on screen until the tool reports ready, for a few
+ * minutes at most. One check in flight at a time: `claude auth status` can take seconds.
+ */
+let brainWatch: ReturnType<typeof setInterval> | null = null;
+let brainWatchUntil = 0;
+let brainCheckInFlight = false;
+
+function watchBrain(): void {
+  brainWatchUntil = Date.now() + 5 * 60_000;
+  if (brainWatch) return;
+  brainWatch = setInterval(() => void pollBrain(), 4000);
+}
+
+function stopWatchingBrain(): void {
+  if (brainWatch) clearInterval(brainWatch);
+  brainWatch = null;
+}
+
+async function pollBrain(): Promise<void> {
+  if (brainCheckInFlight) return;
+  if ($("view-setup").hidden || Date.now() > brainWatchUntil) {
+    stopWatchingBrain();
+    return;
+  }
+  brainCheckInFlight = true;
+  try {
+    if (await checkBrain()) {
+      stopWatchingBrain();
+      void refreshSetupStatus();
+    }
+  } finally {
+    brainCheckInFlight = false;
+  }
+}
+
+const LOOKS_LIKE_TOKEN = /^(ntn_|secret_)[A-Za-z0-9_-]{20,}$/;
+let tokenTestTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setNotionStatus(text: string, state: "" | "ok" | "bad"): void {
+  const status = $("notion-status");
+  status.textContent = text;
+  status.className = `notion-status ${state}`.trim();
+}
+
+/**
+ * Checks a secret against Notion and, when it works, keeps it at once: the step is done whether
+ * or not Save is pressed afterwards. A secret that connects but sees no pages is still saved;
+ * the message says what to do next, and the badge turns green when it can see something.
+ */
+async function testNotion(token: string, options: { save?: boolean } = {}): Promise<void> {
+  if (!token) {
+    setNotionStatus("", "");
+    return;
+  }
+  setNotionStatus("Checking…", "");
+  const result = await window.oracle.testNotion(token);
+  setNotionStatus(result.message, result.ok ? "ok" : "bad");
+  if (result.ok && options.save && token !== settings.notionToken) {
+    settings = await window.oracle.saveSettings({ notionToken: token });
+    void refreshSetupStatus();
+  }
 }
 
 async function saveSetup(): Promise<void> {
@@ -756,18 +830,35 @@ function wireControls(): void {
     });
   }
   $("btn-recheck").addEventListener("click", () => void checkBrain());
+  // Both open a terminal and then watch for the result, so the badge turns green on its own.
   $("btn-install").addEventListener("click", () => {
     $("install-help").hidden = false;
+    void window.oracle.openInstall(selectedBrain());
+    watchBrain();
+  });
+  $("btn-signin").addEventListener("click", () => {
+    void window.oracle.openSignIn(selectedBrain());
+    watchBrain();
+  });
+  $("install-docs").addEventListener("click", (e) => {
+    e.preventDefault();
     void window.oracle.openExternal(INSTALL_DOCS[selectedBrain()]);
   });
-  $("btn-signin").addEventListener("click", () => void window.oracle.openSignIn(selectedBrain()));
-  $("btn-test-notion").addEventListener("click", async () => {
-    const status = $("notion-status");
-    status.textContent = "Testing…";
-    const result = await window.oracle.testNotion($<HTMLInputElement>("notion-token").value);
-    status.textContent = result.message;
-    status.style.color = result.ok ? "var(--ok)" : "var(--danger)";
+  // Coming back from the terminal or the browser is the moment the answer is likely to have changed.
+  window.addEventListener("focus", () => {
+    if (brainWatch) void pollBrain();
   });
+  // The secret is checked as soon as what was pasted looks like one; no button needed.
+  $("notion-token").addEventListener("input", () => {
+    const value = $<HTMLInputElement>("notion-token").value.trim();
+    if (tokenTestTimer) clearTimeout(tokenTestTimer);
+    if (!LOOKS_LIKE_TOKEN.test(value)) {
+      setNotionStatus("", "");
+      return;
+    }
+    tokenTestTimer = setTimeout(() => void testNotion(value, { save: true }), 600);
+  });
+  $("btn-test-notion").addEventListener("click", () => void testNotion($<HTMLInputElement>("notion-token").value.trim(), { save: true }));
   $("btn-save").addEventListener("click", () => void saveSetup());
   $("btn-quit").addEventListener("click", () => void window.oracle.quit());
   document.addEventListener("click", (e) => {

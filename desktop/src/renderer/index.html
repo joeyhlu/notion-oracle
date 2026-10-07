@@ -67,7 +67,7 @@
             </div>
           </div>
           <div id="install-help" class="install-help" hidden>
-            <p class="muted">Run one of these in a terminal, then sign in and re-check:</p>
+            <p class="muted">The Install button opens a terminal that runs the installer; Oracle notices when it finishes. To run it yourself instead, use one of these (<a href="#" id="install-docs">vendor instructions</a>):</p>
             <pre id="install-cmd-native"></pre>
             <pre id="install-cmd-npm"></pre>
           </div>
@@ -91,11 +91,11 @@
           <p class="muted">Lets Oracle read and write your Notion pages and databases.</p>
           <ol class="steps">
             <li>Open <a href="https://www.notion.so/profile/integrations" data-external>notion.so/profile/integrations</a> and create an <strong>internal</strong> integration with read, update and insert capabilities.</li>
-            <li>Paste its <em>Internal Integration Secret</em> below.</li>
+            <li>Paste its <em>Internal Integration Secret</em> below. It is checked, and kept, as soon as you paste it.</li>
             <li><strong>Share your pages with it</strong> — in Notion, <strong>•••</strong> → <strong>Connections</strong> → add the integration. Sharing a top-level page includes everything under it. <em>This step is the one people miss.</em></li>
           </ol>
           <label>Integration secret<input type="password" id="notion-token" placeholder="ntn_… or secret_…"></label>
-          <div class="status-actions"><button id="btn-test-notion" class="chip">Test connection</button> <span id="notion-status" class="muted"></span></div>
+          <div class="status-actions"><button id="btn-test-notion" class="chip">Test connection</button> <span id="notion-status" class="notion-status"></span></div>
         </div>
       </section>
 
