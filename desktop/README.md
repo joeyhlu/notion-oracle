@@ -39,7 +39,7 @@ The app opens the setup screen on first launch.
 - Editing works in place now: "rewrite this section more formally", "convert the Terms list to LaTeX", "turn that paragraph into a heading". Oracle reads the page's block ids, then rewrites, inserts or deletes individual blocks.
 - Try: "Summarize this page", "What's on my calendar this week?", "Add *Dentist* on Sept 12 at 2pm to my Calendar", "Create a page under this one called Q4 Plan with an outline", "Turn this page into a to-do list and add it to the end".
 - Each tool call shows as a small chip while it runs. **Stop** cancels a turn. **✚** starts a new conversation; **⚙** reopens settings.
-- Right-click the tray icon for **Start at login** and **Quit**.
+- Right-click the tray icon for **Start at login**, **Show log file** and **Quit**. The log records failed turns and crashes (messages only, never your pages or secrets); it is what to attach to an issue.
 
 ## How it works
 
@@ -61,7 +61,9 @@ The app opens the setup screen on first launch.
 - `src/main/notion-window.ts` reads the Notion app's front window title (AppleScript on Mac, PowerShell on Windows) and passes it to the model as "the page the user is looking at". The model then finds that page by title with `search_notion`.
 - Notion links in replies open in the Notion app (`notion://`).
 
-Settings live in the app's user-data folder (`settings.json`); the Notion token never leaves your machine except in requests to `api.notion.com`.
+Settings live in the app's user-data folder (`settings.json`), next to `logs/oracle.log`, the change journal and saved conversations; the Notion token never leaves your machine except in requests to `api.notion.com`. Requests to Notion time out after 30 seconds and a rate-limited one is retried after the wait Notion asks for.
+
+Requires macOS 13 or later, Windows 10 or later, or a 64-bit Linux (Electron 44).
 
 ## Verified vs. not
 

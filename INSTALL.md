@@ -10,6 +10,8 @@ If you are comfortable with a terminal, the short version is in [`desktop/README
 
 ### Pick the right file
 
+The app needs macOS 13 or later, Windows 10 or later, or a 64-bit Linux.
+
 On a Mac, click the  menu → **About This Mac**:
 
 - It says **Apple M1 / M2 / M3 / M4** → you want the **arm64** file.
@@ -136,5 +138,6 @@ Run these in order. Each builds on the last, so the first one that fails tells y
 | Test Notion sees zero pages | Same — the integration has not been added to any page. |
 | Mac: "app is damaged" or won't open | Work down the three steps in Part 1 — right-click → Open, then System Settings → Privacy & Security → Open Anyway, then the `xattr` + `codesign` commands. |
 | Nothing happens after a long pause | Open a new conversation with **✚**; if it persists, check the AI tool still reports signed in. |
+| Something else, or the app vanished | Right-click the menu-bar / tray icon → **Show log file**. The log holds error messages only, never your pages or secrets; attach it to an issue. |
 
 Found something not covered here? [Open an issue](../../issues) with the exact error text and what you asked.

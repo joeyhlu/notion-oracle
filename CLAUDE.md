@@ -35,13 +35,17 @@ several data sources; resolve with `resolveDataSource` before querying or writin
 
 ```bash
 cd desktop
-npm run check    # typecheck + build + 213 tests
+npm run check    # typecheck + build + 216 tests
 npm run smoke    # renders the built panel in Chromium, both themes  (needs a browser, see below)
 npm start        # run from source
-cd ../extension && npm run check   # typecheck + 75 tests + build
+cd ../extension && npm run check   # typecheck + 83 tests + build
 npm run e2e                        # loads dist/ into Chromium against a mock Notion: every feature
 npm run package                    # zip for the release page / Chrome Web Store
 ```
+
+Node 22.12 or later (`.nvmrc`, `engines`). The test scripts pass `--experimental-strip-types`
+themselves: on a Node 22 older than 22.18 the flag is required and without it every test file
+fails to load, while CI's floating 22 never saw that.
 
 `npm test` runs against `dist/`, not `src/`. **Rebuild before testing a source change** or you are
 testing the previous build. `npm run check` and `npm run smoke` both build first; bare
@@ -67,9 +71,17 @@ per-rule specificity races.
 is; anything else fails with "Block type mismatch". Converting a paragraph to a to-do means
 inserting the replacement after it and archiving the original. `replaceBlock` does this.
 
-**CI runs the desktop job on ubuntu only.** A platform-conditional assertion can therefore only
-fail in the release workflow, which runs all three. That has happened; it cost a release with no
-Windows installer.
+**CI runs the desktop unit tests on all three platforms, with macOS west of UTC.** It used to run
+on ubuntu only, so a platform-conditional assertion could only fail in the release workflow; that
+cost a release its Windows installer. The timezone matters too: CI runners are UTC, and a local
+date formatted through `toISOString()` is right there and a day off in the Americas. The Outlook
+recurrence end date shipped that way. Format calendar dates with `localIso` from
+`calendar-record.ts`, never `toISOString().slice(0, 10)`.
+
+**Tests must not ask the real OS anything.** `calendar_status` and the keystroke fallback probe
+whether Notion Calendar is running; the probe sits on `probes` in `mcp/calendar-app.ts` and
+`tests/calendar-server.test.ts` replaces it. Before that the tests passed on CI and failed on any
+Mac with the app open.
 
 **`normalizeId` rejects anything that is not a Notion UUID.** Test fixtures need real-shaped ids.
 
@@ -139,6 +151,24 @@ Every mutating Notion or calendar tool must record a reversible entry to the cha
 enough before-state to undo it. Capture that state before the write — Notion keeps no version to
 fall back on.
 
+The Notion client (`extension/src/lib/notion.ts`, shared by both apps) gives each request a
+30-second timeout and up to three attempts. A 429 waits the `Retry-After` Notion sends; a 502 or
+503 backs off; a 504, a timeout or a dropped connection is retried only for a GET, because a
+write that lost its answer may already have happened. Keep writes non-retried on those.
+
+The main process writes failures to `logs/oracle.log` under the user-data folder (`main/log.ts`;
+one previous file kept at 1 MB), and "Show log file" in the tray menu opens it. Log messages and
+stacks only: never the Notion token, a prompt, or page content. There is no telemetry and nothing
+leaves the machine; the README promises that.
+
+Links the model writes are opened only when they are `http`, `https` or `notion:`; `main.ts`
+`openExternal` refuses the rest. Keep that allow-list when adding a new way out of the app.
+
+Dependencies: Electron must stay within its newest three majors, since only those get Chromium
+security fixes and the renderer shows model-written text. Dependabot opens the bumps weekly. The
+one open `npm audit` finding, `sprintf-js` under electron-builder's downloader, has no patched
+release and only runs at build time; it is accepted, not forgotten.
+
 Calendar edits go through `mcp/calendar-edit.ts` (find by title, plan new times) and
 `mcp/rrule.ts` (repeat rules); both are pure and tested on Linux. The backends only carry out a
 plan. A series is one record from the scripts, dated at its first occurrence, and `expandListing`
@@ -163,6 +193,12 @@ to change or clear a rule, and the Outlook recurrence pattern in `win-calendar.t
 Two undo paths are pinned by request shape but unconfirmed against the live API: `unarchiveBlock`
 (`PATCH {archived:false}`) and `restore-page-properties`. A failure in either is visible and
 recoverable — the journal entry stays un-undone with the error shown.
+
+The Electron 44 build has been packaged and ad-hoc signed on an Apple Silicon Mac, its renderer
+checked in Chromium, and its bundled MCP server run under the packaged binary as Node. The app
+itself has not been launched from that package: a second ad-hoc-signed build on a Mac that already
+runs Oracle triggers fresh Automation prompts. The Windows and Linux packages on Electron 44 come
+only from the release workflow and have not been run by hand.
 
 The extension is verified end to end only against a mock Notion page and scripted APIs. Not yet
 confirmed on the live notion.so: that Notion's editor accepts the synthetic paste (the fallbacks

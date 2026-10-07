@@ -102,6 +102,8 @@ Your Notion content goes to Anthropic or OpenAI — whichever account you connec
 
 ## Development
 
+Node 22.12 or later (`.nvmrc`).
+
 ```bash
 cd desktop && npm install
 npm run check     # typecheck, build, unit tests
