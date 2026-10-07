@@ -145,8 +145,9 @@ Releases go through `workflow_dispatch` on `.github/workflows/release.yml` with 
 empty tag is a dry run that builds all three platforms and uploads workflow artifacts only. A
 release has five assets, named without the version so that
 `releases/latest/download/<name>` is a link that never changes: `Notion-Oracle-mac-arm64.dmg`,
-`Notion-Oracle-mac-x64.dmg`, `Notion-Oracle-win-x64.exe`, `Notion-Oracle-linux-x64.AppImage` and
-`notion-oracle-extension.zip`. The README's download table, INSTALL.md and `docs/index.html`
+`Notion-Oracle-mac-x64.dmg`, `Notion-Oracle-win-x64.exe`, `Notion-Oracle-linux-x86_64.AppImage` and
+`notion-oracle-extension.zip` (electron-builder spells the AppImage arch `x86_64`, not `x64`; the
+1.0.0 release shipped with the docs saying `x64` and that link was dead for ten minutes). The README's download table, INSTALL.md and `docs/index.html`
 (the GitHub Pages site, deployed by `pages.yml` from `main`) all use those links; renaming an
 asset breaks every one of them.
 Pushing a tag directly returns 403 from the session token. Always confirm the release's **asset

@@ -105,7 +105,7 @@
       <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-arm64.dmg">Mac, Apple silicon</a>
       <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-x64.dmg">Mac, Intel</a>
       <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-win-x64.exe">Windows</a>
-      <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x64.AppImage">Linux</a>
+      <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x86_64.AppImage">Linux</a>
       <a href="https://github.com/joeyhlu/notion-oracle/releases/latest/download/notion-oracle-extension.zip">Browser extension</a>
       <a href="https://github.com/joeyhlu/notion-oracle/releases/latest">Release notes</a>
     </p>
@@ -160,7 +160,7 @@
       var primary = document.getElementById("primary"), label = document.getElementById("primary-label");
       var secondary = document.getElementById("secondary"), macNote = document.getElementById("mac-note");
       if (os === "win") { primary.href = base + "Notion-Oracle-win-x64.exe"; label.textContent = "Download for Windows"; secondary.hidden = true; macNote.hidden = true; }
-      else if (os === "linux") { primary.href = base + "Notion-Oracle-linux-x64.AppImage"; label.textContent = "Download for Linux (AppImage)"; secondary.hidden = true; macNote.hidden = true; }
+      else if (os === "linux") { primary.href = base + "Notion-Oracle-linux-x86_64.AppImage"; label.textContent = "Download for Linux (AppImage)"; secondary.hidden = true; macNote.hidden = true; }
       else if (os !== "mac") { label.textContent = "Download for Mac (Apple silicon)"; }
     })();
   </script>

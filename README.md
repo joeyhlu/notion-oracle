@@ -20,7 +20,7 @@ Every link below always points at the newest release. **[notion-oracle on GitHub
 | **Mac, Apple silicon** (M1 and later) | [Notion-Oracle-mac-arm64.dmg](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-arm64.dmg) | Open the DMG, drag the app to Applications. First launch: right-click → **Open** (see [INSTALL.md](INSTALL.md)) |
 | **Mac, Intel** | [Notion-Oracle-mac-x64.dmg](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-x64.dmg) | Same |
 | **Windows** | [Notion-Oracle-win-x64.exe](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-win-x64.exe) | Run it. At "Windows protected your PC": **More info → Run anyway** |
-| **Linux** | [Notion-Oracle-linux-x64.AppImage](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x64.AppImage) | `chmod +x`, then run |
+| **Linux** | [Notion-Oracle-linux-x86_64.AppImage](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x86_64.AppImage) | `chmod +x`, then run |
 | **Browser extension** (Chrome, Edge, Brave, Arc) | [notion-oracle-extension.zip](https://github.com/joeyhlu/notion-oracle/releases/latest/download/notion-oracle-extension.zip) | Unzip, then `chrome://extensions` → Developer mode → **Load unpacked** |
 
 Not sure which Mac you have? Apple menu → **About This Mac**: "Apple M1/M2/M3/M4" means Apple silicon.

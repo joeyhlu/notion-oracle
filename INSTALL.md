@@ -28,7 +28,7 @@ Go to the [latest release](../../releases/latest) and scroll to **Assets** near 
 | Mac, Apple chip | [`Notion-Oracle-mac-arm64.dmg`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-arm64.dmg) |
 | Mac, Intel chip | [`Notion-Oracle-mac-x64.dmg`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-mac-x64.dmg) |
 | Windows | [`Notion-Oracle-win-x64.exe`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-win-x64.exe) |
-| Linux | [`Notion-Oracle-linux-x64.AppImage`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x64.AppImage) |
+| Linux | [`Notion-Oracle-linux-x86_64.AppImage`](https://github.com/joeyhlu/notion-oracle/releases/latest/download/Notion-Oracle-linux-x86_64.AppImage) |
 
 The links always point at the newest release, and [joeyhlu.github.io/notion-oracle](https://joeyhlu.github.io/notion-oracle/) picks the right one for the computer you open it on.
 
@@ -36,7 +36,7 @@ The links always point at the newest release, and [joeyhlu.github.io/notion-orac
 
 - **Mac:** double-click the `.dmg`. A window opens with the app icon next to an Applications folder — drag the icon onto the folder.
 - **Windows:** double-click the `.exe` and click through the installer.
-- **Linux:** `chmod +x Notion-Oracle-linux-x64.AppImage`, then run it.
+- **Linux:** `chmod +x Notion-Oracle-linux-x86_64.AppImage`, then run it.
 
 ### The first launch will look blocked. It isn't broken.
 
