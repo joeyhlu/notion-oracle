@@ -87,7 +87,7 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$app"
             echo "::endgroup::"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: notion-oracle-${{ matrix.os }}
           path: ${{ matrix.artifact }}
@@ -118,7 +118,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node scripts/e2e.mjs
       - run: node scripts/package.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: notion-oracle-extension
           path: extension/release/*.zip

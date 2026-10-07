@@ -25,7 +25,7 @@ jobs:
       # setup, the AI menu, chat, web search, mentions, undo, history and both themes.
       - run: npx playwright install --with-deps chromium
       - run: node scripts/e2e.mjs --out screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: extension-screenshots
@@ -67,7 +67,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: matrix.os == 'ubuntu-latest'
         run: node scripts/smoke.mjs --out screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always() && matrix.os == 'ubuntu-latest'
         with:
           name: panel-screenshots
